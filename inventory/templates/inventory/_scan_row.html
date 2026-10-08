@@ -1,0 +1,8 @@
+<tr id="scan-{{ scan.pk }}"{% if not scan.is_finished %} hx-get="{% url 'scan-row' scan.pk %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  <td><a href="{% url 'scan-detail' scan.pk %}">{{ scan.pk }}</a></td>
+  <td class="font-monospace">{{ scan.targets }}</td>
+  <td>{% include "inventory/_status_badge.html" %}</td>
+  <td>{{ scan.device_count|default_if_none:"—" }}</td>
+  <td title="{{ scan.created_at }}">{{ scan.created_at|timesince }} ago</td>
+  <td>{{ scan.requested_by|default:"—" }}</td>
+</tr>

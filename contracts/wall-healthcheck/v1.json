@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "wall-healthcheck output",
+  "description": "Checks whether hosts answer. Usage: wall-healthcheck TARGET [TARGET ...] [--attempts N] [--timeout-ms MS]. A TARGET is an IPv4 address (ICMP echo) or IP:PORT (TCP connect to that port). A host being down is a normal result, not an error.",
+  "type": "object",
+  "required": ["schema_version", "tool", "started_at", "duration_ms", "status", "errors", "params", "result"],
+  "properties": {
+    "schema_version": { "$ref": "#/$defs/schema_version" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "started_at": { "$ref": "#/$defs/timestamp" },
+    "duration_ms": {
+      "description": "Wall-clock run time in milliseconds.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "description": "ok: finished with no errors. partial: finished, result present but incomplete (see errors). error: failed, result is null.",
+      "enum": ["ok", "partial", "error"]
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "params": { "$ref": "#/$defs/params" },
+    "result": {
+      "description": "Tool-specific payload; null when status is error.",
+      "type": ["object", "null"]
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "ok -> no errors, result present",
+      "if": { "required": ["status"], "properties": { "status": { "const": "ok" } } },
+      "then": { "properties": { "errors": { "maxItems": 0 }, "result": { "$ref": "#/$defs/result" } } }
+    },
+    {
+      "$comment": "partial -> at least one error, result present",
+      "if": { "required": ["status"], "properties": { "status": { "const": "partial" } } },
+      "then": { "properties": { "errors": { "minItems": 1 }, "result": { "$ref": "#/$defs/result" } } }
+    },
+    {
+      "$comment": "error -> at least one error, result is null",
+      "if": { "required": ["status"], "properties": { "status": { "const": "error" } } },
+      "then": { "properties": { "errors": { "minItems": 1 }, "result": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "schema_version": {
+      "description": "Contract version, MAJOR.MINOR. This file is the contract for major version 1: every 1.x document must validate against it.",
+      "type": "string",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$"
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "description": "Program that produced the document, e.g. \"wall-scan\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "description": "Package version of that program (its git tag without the leading v). Independent of schema_version.",
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"
+        }
+      }
+    },
+    "timestamp": {
+      "description": "RFC 3339 date-time in UTC with a Z suffix, e.g. \"2026-10-08T09:30:00Z\". Fractional seconds allowed.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "target"],
+      "properties": {
+        "code": {
+          "description": "Machine-readable snake_case code. Open set: new codes may appear in any minor version, so consumers must handle codes they do not know.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "message": {
+          "description": "Human-readable explanation, safe to show in the UI.",
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "description": "The input (usually an IP address) this error is about, or null for an error affecting the whole run.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+
+    "ipv4": {
+      "type": "string",
+      "format": "ipv4"
+    },
+    "params": {
+      "description": "The run-wide inputs. Each target's address and method are in its check entry.",
+      "type": "object",
+      "required": ["attempts", "timeout_ms"],
+      "properties": {
+        "attempts": {
+          "description": "Probes sent to each target.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_ms": {
+          "description": "How long to wait for each probe, in milliseconds.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["checks"],
+      "properties": {
+        "checks": {
+          "description": "One entry per target, in the order the targets were given.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/check" }
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": ["ip", "method", "port", "up", "successes", "rtt_ms", "down_reason"],
+      "properties": {
+        "ip": { "$ref": "#/$defs/ipv4" },
+        "method": {
+          "description": "icmp: echo request (ping). tcp: TCP connect to port, for hosts that drop ping, such as Windows PCs with the default firewall rules.",
+          "enum": ["icmp", "tcp"]
+        },
+        "port": {
+          "description": "TCP port for method tcp; null for icmp.",
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "up": {
+          "description": "true if at least one probe succeeded. For tcp, a refused connection counts as down: the host is reachable but the port is closed.",
+          "type": "boolean"
+        },
+        "successes": {
+          "description": "Probes that succeeded, out of params.attempts. Below attempts while up means packet loss.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "rtt_ms": {
+          "description": "Mean round-trip time of the successful probes, in milliseconds. For tcp, the time to complete the TCP handshake. null when down.",
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "down_reason": {
+          "description": "Why the last probe failed, null when up. Open set; current values: timeout, refused, host_unreachable, network_unreachable.",
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "port is set exactly for tcp checks",
+          "if": { "required": ["method"], "properties": { "method": { "const": "tcp" } } },
+          "then": { "properties": { "port": { "type": "integer" } } },
+          "else": { "properties": { "port": { "type": "null" } } }
+        },
+        {
+          "$comment": "up -> rtt and no reason; down -> no rtt, a reason, zero successes",
+          "if": { "required": ["up"], "properties": { "up": { "const": true } } },
+          "then": { "properties": { "successes": { "minimum": 1 }, "rtt_ms": { "type": "number" }, "down_reason": { "type": "null" } } },
+          "else": { "properties": { "successes": { "const": 0 }, "rtt_ms": { "type": "null" }, "down_reason": { "type": "string" } } }
+        }
+      ]
+    }
+  }
+}

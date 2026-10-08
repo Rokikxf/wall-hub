@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "tool": { "name": "wall-snmpinfo", "version": "0.1.0" },
+  "started_at": "2026-10-08T09:36:00Z",
+  "duration_ms": 96,
+  "status": "ok",
+  "errors": [],
+  "params": {
+    "target": "192.168.1.10",
+    "port": 161,
+    "snmp_version": "2c",
+    "timeout_ms": 2000,
+    "retries": 1
+  },
+  "result": {
+    "system": {
+      "descr": "Linux wall-vm 6.8.0-45-generic #45-Ubuntu SMP PREEMPT_DYNAMIC x86_64",
+      "object_id": "1.3.6.1.4.1.8072.3.2.10",
+      "name": "wall-vm",
+      "location": "Server cupboard",
+      "contact": "it@example.com",
+      "uptime_s": 4021
+    },
+    "model": null,
+    "serial_number": null,
+    "supplies": null
+  }
+}

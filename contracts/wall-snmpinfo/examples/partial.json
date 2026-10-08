@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "tool": { "name": "wall-snmpinfo", "version": "0.1.0" },
+  "started_at": "2026-10-08T09:37:00Z",
+  "duration_ms": 6230,
+  "status": "partial",
+  "errors": [
+    {
+      "code": "supplies_timeout",
+      "message": "Timed out while reading prtMarkerSuppliesTable; supply levels are unavailable for this run",
+      "target": "192.168.1.51"
+    }
+  ],
+  "params": {
+    "target": "192.168.1.51",
+    "port": 161,
+    "snmp_version": "2c",
+    "timeout_ms": 2000,
+    "retries": 1
+  },
+  "result": {
+    "system": {
+      "descr": "Brother NC-8300w, Firmware Ver.1.10",
+      "object_id": "1.3.6.1.4.1.2435.2.3.9.1",
+      "name": "BRN001BA9123456",
+      "location": null,
+      "contact": null,
+      "uptime_s": 120554
+    },
+    "model": "Brother HL-L2350DW series",
+    "serial_number": "E78123A4N567890",
+    "supplies": null
+  }
+}

@@ -1,0 +1,86 @@
+# wall-hub on a single Docker host (the Ubuntu VM).
+#
+#   web     Django + gunicorn on port 8000. Applies migrations on start.
+#   worker  Celery worker that runs wall-scan. It uses the host's network so
+#           nmap is on the same network segment as the devices (ARP, MAC
+#           addresses), with the capabilities nmap needs for raw packets.
+#   db      PostgreSQL.  redis  Redis, the Celery broker.
+#
+# db and redis publish their ports on 127.0.0.1 only: the host-network worker
+# reaches them there, and nothing else on the LAN can.
+
+x-app: &app
+  build: .
+  image: wall-hub
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    <<: *app
+    command: >-
+      sh -c "python manage.py migrate --noinput
+      && exec gunicorn wallhub.wsgi --bind 0.0.0.0:8000 --workers 2 --access-logfile -"
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "${WALL_HUB_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/accounts/login/')"
+      interval: 10s
+      start_period: 20s
+      retries: 6
+
+  worker:
+    <<: *app
+    command: celery -A wallhub worker --loglevel=INFO --concurrency=2
+    environment:
+      POSTGRES_HOST: 127.0.0.1
+      REDIS_URL: redis://127.0.0.1:6379/0
+      WALL_SCAN_PRIVILEGED: "true"
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "wall-snmpinfo output",
+  "description": "Reads identity, uptime and printer supply levels from one device over SNMP. Usage: wall-snmpinfo IP [--snmp-version 2c] [--port 161] [--timeout-ms MS] [--retries N]. The community string comes from the WALL_SNMP_COMMUNITY environment variable, not the command line (other users can read command lines in the process list), and never appears in the output.",
+  "type": "object",
+  "required": ["schema_version", "tool", "started_at", "duration_ms", "status", "errors", "params", "result"],
+  "properties": {
+    "schema_version": { "$ref": "#/$defs/schema_version" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "started_at": { "$ref": "#/$defs/timestamp" },
+    "duration_ms": {
+      "description": "Wall-clock run time in milliseconds.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "description": "ok: finished with no errors. partial: finished, result present but incomplete (see errors). error: failed, result is null.",
+      "enum": ["ok", "partial", "error"]
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "params": { "$ref": "#/$defs/params" },
+    "result": {
+      "description": "Tool-specific payload; null when status is error.",
+      "type": ["object", "null"]
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "ok -> no errors, result present",
+      "if": { "required": ["status"], "properties": { "status": { "const": "ok" } } },
+      "then": { "properties": { "errors": { "maxItems": 0 }, "result": { "$ref": "#/$defs/result" } } }
+    },
+    {
+      "$comment": "partial -> at least one error, result present",
+      "if": { "required": ["status"], "properties": { "status": { "const": "partial" } } },
+      "then": { "properties": { "errors": { "minItems": 1 }, "result": { "$ref": "#/$defs/result" } } }
+    },
+    {
+      "$comment": "error -> at least one error, result is null",
+      "if": { "required": ["status"], "properties": { "status": { "const": "error" } } },
+      "then": { "properties": { "errors": { "minItems": 1 }, "result": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "schema_version": {
+      "description": "Contract version, MAJOR.MINOR. This file is the contract for major version 1: every 1.x document must validate against it.",
+      "type": "string",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$"
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "description": "Program that produced the document, e.g. \"wall-scan\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "description": "Package version of that program (its git tag without the leading v). Independent of schema_version.",
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"
+        }
+      }
+    },
+    "timestamp": {
+      "description": "RFC 3339 date-time in UTC with a Z suffix, e.g. \"2026-10-08T09:30:00Z\". Fractional seconds allowed.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "target"],
+      "properties": {
+        "code": {
+          "description": "Machine-readable snake_case code. Open set: new codes may appear in any minor version, so consumers must handle codes they do not know.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "message": {
+          "description": "Human-readable explanation, safe to show in the UI.",
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "description": "The input (usually an IP address) this error is about, or null for an error affecting the whole run.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+
+    "ipv4": {
+      "type": "string",
+      "format": "ipv4"
+    },
+    "text": {
+      "description": "An SNMP OCTET STRING decoded as UTF-8 (invalid bytes replaced), with trailing NUL bytes and whitespace removed. null when the object is missing or empty.",
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "params": {
+      "description": "The inputs of this run. Credentials (community string, SNMPv3 keys) are deliberately absent.",
+      "type": "object",
+      "required": ["target", "port", "snmp_version", "timeout_ms", "retries"],
+      "properties": {
+        "target": { "$ref": "#/$defs/ipv4" },
+        "port": {
+          "description": "UDP port of the SNMP agent, normally 161.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "snmp_version": {
+          "description": "SNMP protocol version. Version 3 is listed now so that supporting it later is not a breaking change.",
+          "enum": ["1", "2c", "3"]
+        },
+        "timeout_ms": {
+          "description": "How long to wait for each SNMP response, in milliseconds.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "retries": {
+          "description": "Resends after a timeout, per request.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["system", "model", "serial_number", "supplies"],
+      "properties": {
+        "system": { "$ref": "#/$defs/system" },
+        "model": {
+          "$ref": "#/$defs/text",
+          "description": "Device model: ENTITY-MIB entPhysicalModelName (switches, routers) or, for printers, HOST-RESOURCES-MIB hrDeviceDescr of the printer device. null if the device reports neither."
+        },
+        "serial_number": {
+          "$ref": "#/$defs/text",
+          "description": "Printer-MIB prtGeneralSerialNumber (printers) or ENTITY-MIB entPhysicalSerialNum (switches, routers). null if the device reports neither."
+        },
+        "supplies": {
+          "description": "Printer-MIB prtMarkerSuppliesTable, sorted by index. null = the device does not implement Printer-MIB (not a printer), or reading the table failed (status is then partial and errors says so). [] = the device implements it but lists no supplies.",
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/supply" }
+        }
+      }
+    },
+    "system": {
+      "description": "MIB-II system group (1.3.6.1.2.1.1), which every SNMP agent implements.",
+      "type": "object",
+      "required": ["descr", "object_id", "name", "location", "contact", "uptime_s"],
+      "properties": {
+        "descr": {
+          "$ref": "#/$defs/text",
+          "description": "sysDescr.0: free-text description, often including model and firmware."
+        },
+        "object_id": {
+          "description": "sysObjectID.0 in dotted form. The number after 1.3.6.1.4.1 is the vendor's IANA enterprise number (11 = HP, 9 = Cisco).",
+          "type": ["string", "null"],
+          "pattern": "^[0-2](\\.(0|[1-9][0-9]*))+$"
+        },
+        "name": {
+          "$ref": "#/$defs/text",
+          "description": "sysName.0."
+        },
+        "location": {
+          "$ref": "#/$defs/text",
+          "description": "sysLocation.0, set by an administrator."
+        },
+        "contact": {
+          "$ref": "#/$defs/text",
+          "description": "sysContact.0, set by an administrator."
+        },
+        "uptime_s": {
+          "description": "sysUpTime.0 converted from hundredths of a second to whole seconds. This is the SNMP agent's uptime, normally the same as the device's on printers and switches. The counter wraps after about 497 days.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "supply": {
+      "description": "One row of prtMarkerSuppliesTable (1.3.6.1.2.1.43.11.1.1).",
+      "type": "object",
+      "required": ["index", "description", "type", "colorant", "level_state", "level", "max_capacity", "percent"],
+      "properties": {
+        "index": {
+          "description": "prtMarkerSuppliesIndex. Stable per slot, so it identifies the same supply across runs.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "description": {
+          "$ref": "#/$defs/text",
+          "description": "prtMarkerSuppliesDescription, e.g. \"Black Cartridge HP 414A\"."
+        },
+        "type": {
+          "description": "prtMarkerSuppliesType as a snake_case name, e.g. toner_cartridge, toner, waste_toner, ink_cartridge, opc, fuser. Unrecognised codes appear as code_<n>. Open set.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "colorant": {
+          "$ref": "#/$defs/text",
+          "description": "prtMarkerColorantValue of this supply's colorant, e.g. black, cyan. null for supplies with no colour (drums, fusers, waste containers)."
+        },
+        "level_state": {
+          "description": "Decoded from prtMarkerSuppliesLevel per RFC 3805: measured (value >= 0), other (-1), unknown (-2), some_remaining (-3). Closed set, fixed by the RFC.",
+          "enum": ["measured", "other", "unknown", "some_remaining"]
+        },
+        "level": {
+          "description": "prtMarkerSuppliesLevel when level_state is measured, otherwise null. The unit varies by device: often percent, sometimes pages or tenths of grams.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "max_capacity": {
+          "description": "prtMarkerSuppliesMaxCapacity, in the same unit as level. null when the device reports -1, -2 or 0.",
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "percent": {
+          "description": "round(100 * level / max_capacity), capped at 100. null unless both level and max_capacity are known. Use this for display and low-toner alerts.",
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "level and percent exist only for measured supplies",
+          "if": { "required": ["level_state"], "properties": { "level_state": { "const": "measured" } } },
+          "then": { "properties": { "level": { "type": "integer" } } },
+          "else": { "properties": { "level": { "type": "null" }, "percent": { "type": "null" } } }
+        }
+      ]
+    }
+  }
+}

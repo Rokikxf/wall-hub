@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "tool": { "name": "wall-snmpinfo", "version": "0.1.0" },
+  "started_at": "2026-10-08T09:38:00Z",
+  "duration_ms": 4011,
+  "status": "error",
+  "errors": [
+    {
+      "code": "snmp_timeout",
+      "message": "No SNMP response from 192.168.1.60:161 after 2 tries. SNMP may be disabled, the community string wrong (v2c gives no error for that), or the host down.",
+      "target": "192.168.1.60"
+    }
+  ],
+  "params": {
+    "target": "192.168.1.60",
+    "port": 161,
+    "snmp_version": "2c",
+    "timeout_ms": 2000,
+    "retries": 1
+  },
+  "result": null
+}

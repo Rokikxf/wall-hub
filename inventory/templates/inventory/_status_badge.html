@@ -1,0 +1,5 @@
+{% if scan.status == "ok" %}<span class="badge text-bg-success">OK</span>
+{% elif scan.status == "partial" %}<span class="badge text-bg-warning">Partial</span>
+{% elif scan.status == "error" or scan.status == "failed" %}<span class="badge text-bg-danger" title="{{ scan.message }}">{{ scan.get_status_display }}</span>
+{% elif scan.status == "running" %}<span class="badge text-bg-primary"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Running</span>
+{% else %}<span class="badge text-bg-secondary">{{ scan.get_status_display }}</span>{% endif %}

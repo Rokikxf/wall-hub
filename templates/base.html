@@ -1,0 +1,35 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}wall-hub{% endblock %} · wall-hub</title>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap.min.css' %}">
+  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+</head>
+<body>
+  <nav class="navbar navbar-expand bg-body-tertiary border-bottom mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="{% url 'device-list' %}">wall-hub</a>
+      {% if user.is_authenticated %}
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="{% url 'device-list' %}">Devices</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'scan-list' %}">Scans</a></li>
+        {% if user.is_staff %}<li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Admin</a></li>{% endif %}
+      </ul>
+      <form method="post" action="{% url 'logout' %}" class="d-flex align-items-center gap-2">
+        {% csrf_token %}
+        <span class="navbar-text small">{{ user.get_username }}</span>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Log out</button>
+      </form>
+      {% endif %}
+    </div>
+  </nav>
+  <main class="container">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

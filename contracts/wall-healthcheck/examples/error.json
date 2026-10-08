@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "tool": { "name": "wall-healthcheck", "version": "0.1.0" },
+  "started_at": "2026-10-08T09:34:00Z",
+  "duration_ms": 3,
+  "status": "error",
+  "errors": [
+    {
+      "code": "icmp_not_permitted",
+      "message": "This user may not open ICMP sockets. Allow it with sysctl net.ipv4.ping_group_range, or use IP:PORT targets for TCP checks.",
+      "target": null
+    }
+  ],
+  "params": {
+    "attempts": 3,
+    "timeout_ms": 1000
+  },
+  "result": null
+}

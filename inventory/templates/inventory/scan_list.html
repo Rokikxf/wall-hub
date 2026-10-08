@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Scans{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Scans</h1>
+<form method="post" class="row g-2 align-items-start mb-4">
+  {% csrf_token %}
+  <div class="col-md-6">
+    <label class="visually-hidden" for="{{ form.targets.id_for_label }}">Targets</label>
+    <input class="form-control{% if form.targets.errors %} is-invalid{% endif %}" type="text"
+           name="{{ form.targets.html_name }}" id="{{ form.targets.id_for_label }}"
+           value="{{ form.targets.value|default:'' }}" placeholder="192.168.1.0/24" required>
+    {% for error in form.targets.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+    <div class="form-text">{{ form.targets.help_text }}. Only scan networks you own or have permission to scan.</div>
+  </div>
+  <div class="col-auto"><button type="submit" class="btn btn-primary">Run scan</button></div>
+</form>
+{% if scans %}
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead><tr><th>#</th><th>Targets</th><th>Status</th><th>Devices</th><th>Requested</th><th>By</th></tr></thead>
+    <tbody>
+      {% for scan in scans %}{% include "inventory/_scan_row.html" %}{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-body-secondary">No scans yet.</p>
+{% endif %}
+{% endblock %}
