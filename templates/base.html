@@ -15,6 +15,7 @@
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link" href="{% url 'device-list' %}">Devices</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'scan-list' %}">Scans</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'alert-list' %}">Alerts</a></li>
         {% if user.is_staff %}<li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Admin</a></li>{% endif %}
       </ul>
       <form method="post" action="{% url 'logout' %}" class="d-flex align-items-center gap-2">

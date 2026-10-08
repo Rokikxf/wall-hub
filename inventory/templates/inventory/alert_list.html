@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Alerts</h1>
+<p class="text-body-secondary small">The last 100. Emails go to the addresses in <code>WALL_ALERT_EMAILS</code>; "not sent" means that list is empty.</p>
+{% include "inventory/_alert_table.html" with show_device=True %}
+{% endblock %}

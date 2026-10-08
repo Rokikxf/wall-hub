@@ -1,0 +1,5 @@
+{% if not device.monitored %}<span class="text-body-secondary small">not monitored</span>
+{% elif device.health == "down" %}<span class="badge text-bg-danger" title="Last reason: {{ device.last_down_reason }}">Down since {{ device.down_since|date:"H:i" }}</span>
+{% elif device.consecutive_failures %}<span class="badge text-bg-warning" title="Last reason: {{ device.last_down_reason }}">{{ device.consecutive_failures }} failed check{{ device.consecutive_failures|pluralize }}</span>
+{% elif device.health == "up" %}<span class="badge text-bg-success">Up{% if device.last_rtt_ms is not None %} · {{ device.last_rtt_ms|floatformat:1 }} ms{% endif %}</span>
+{% else %}<span class="badge text-bg-secondary">Not checked yet</span>{% endif %}

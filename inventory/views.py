@@ -9,8 +9,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from kombu.exceptions import OperationalError
 
-from inventory.forms import ScanForm
-from inventory.models import Device, Scan
+from inventory.forms import MonitoringForm, ScanForm
+from inventory.models import Alert, Device, HealthRun, Scan
 from inventory.tasks import run_scan
 
 log = logging.getLogger(__name__)
@@ -19,7 +19,36 @@ log = logging.getLogger(__name__)
 @login_required
 def device_list(request):
     devices = sorted(Device.objects.all(), key=lambda d: ipaddress.IPv4Address(d.ip))
-    return render(request, "inventory/device_list.html", {"devices": devices})
+    context = {
+        "devices": devices,
+        "monitored_count": sum(d.monitored for d in devices),
+        "last_run": HealthRun.objects.first(),
+    }
+    return render(request, "inventory/device_list.html", context)
+
+
+@login_required
+def device_detail(request, pk):
+    device = get_object_or_404(Device, pk=pk)
+    if request.method == "POST":
+        form = MonitoringForm(request.POST, instance=device)
+        if form.is_valid():
+            if form.has_changed():
+                # A new way of checking: earlier results say nothing about it.
+                device.reset_health()
+            form.save()
+            messages.success(request, "Monitoring settings saved.")
+            return redirect("device-detail", pk=device.pk)
+    else:
+        form = MonitoringForm(instance=device)
+    context = {"device": device, "form": form, "alerts": device.alerts.all()[:20]}
+    return render(request, "inventory/device_detail.html", context)
+
+
+@login_required
+def alert_list(request):
+    alerts = Alert.objects.select_related("device")[:100]
+    return render(request, "inventory/alert_list.html", {"alerts": alerts})
 
 
 def queue_scan(scan: Scan) -> bool:

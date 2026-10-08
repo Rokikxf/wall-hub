@@ -155,7 +155,7 @@
           "minimum": 0
         },
         "down_reason": {
-          "description": "Why the last probe failed, null when up. Open set; current values: timeout, refused, host_unreachable, network_unreachable.",
+          "description": "Why the last probe failed, null when up. Open set; current values: timeout, refused, host_unreachable, network_unreachable, network_error (any other socket error).",
           "type": ["string", "null"],
           "pattern": "^[a-z][a-z0-9_]*$"
         }

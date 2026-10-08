@@ -1,14 +1,56 @@
-"""manage.py scan, and the startup checks in inventory/checks.py."""
+"""manage.py scan and healthcheck, and the startup checks in inventory/checks.py."""
 
 from io import StringIO
 
 import pytest
 from django.core.management import CommandError, call_command
+from helpers import check
 from jsonschema import Draft202012Validator
 
 from inventory.checks import contracts_are_valid_schemas, date_time_values_are_checked
 from inventory.models import Scan
-from inventory.tasks import run_scan
+from inventory.tasks import run_healthchecks, run_scan
+
+# --- manage.py healthcheck ---
+
+
+@pytest.fixture
+def health_worker(monkeypatch):
+    """Run queued health checks immediately in this process instead of in a Celery worker."""
+    monkeypatch.setattr(
+        "inventory.management.commands.healthcheck.run_healthchecks.delay", run_healthchecks
+    )
+
+
+@pytest.mark.django_db
+def test_healthcheck_command_waits_for_the_result(
+    health_worker, fake_tool, make_device, healthcheck_doc
+):
+    device = make_device("127.0.0.1", monitored=True)
+    fake_tool(stdout=healthcheck_doc(check(device.ip)))
+    out = StringIO()
+
+    call_command("healthcheck", "--wait", stdout=out)
+
+    assert "finished: 1 checked, 1 up, 0 down" in out.getvalue()
+
+
+@pytest.mark.django_db
+def test_healthcheck_command_fails_when_the_run_fails(health_worker, fake_tool, make_device):
+    make_device("127.0.0.1", monitored=True)
+    fake_tool(raises=FileNotFoundError())
+
+    with pytest.raises(CommandError, match="failed: wall-healthcheck is not installed"):
+        call_command("healthcheck", "--wait", stdout=StringIO())
+
+
+@pytest.mark.django_db
+def test_healthcheck_command_needs_monitored_devices(make_device):
+    make_device("127.0.0.1")
+
+    with pytest.raises(CommandError, match="No devices are monitored"):
+        call_command("healthcheck")
+
 
 # --- manage.py scan ---
 

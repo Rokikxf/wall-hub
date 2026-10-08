@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ device }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'device-list' %}">← All devices</a></p>
+<h1 class="h3 mb-3">{{ device }} {% include "inventory/_health_badge.html" %}</h1>
+<div class="row g-4">
+  <div class="col-lg-6">
+    <dl class="row">
+      <dt class="col-sm-4">IP address</dt><dd class="col-sm-8 font-monospace">{{ device.ip }}</dd>
+      <dt class="col-sm-4">Hostname</dt><dd class="col-sm-8">{{ device.hostname|default:"—" }}</dd>
+      <dt class="col-sm-4">MAC address</dt><dd class="col-sm-8 font-monospace">{{ device.mac|default:"—" }}</dd>
+      <dt class="col-sm-4">Vendor</dt><dd class="col-sm-8">{{ device.vendor|default:"—" }}</dd>
+      <dt class="col-sm-4">Open ports</dt>
+      <dd class="col-sm-8">{% if device.open_ports is None %}not scanned{% else %}{% for port in device.open_ports %}{{ port.port }}/{{ port.protocol }}{% if port.service %} ({{ port.service }}){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}none{% endfor %}{% endif %}</dd>
+      <dt class="col-sm-4">First seen</dt><dd class="col-sm-8">{{ device.first_seen }}</dd>
+      <dt class="col-sm-4">Last seen</dt><dd class="col-sm-8">{{ device.last_seen }}</dd>
+      {% if device.monitored %}
+      <dt class="col-sm-4">Last check</dt><dd class="col-sm-8">{% if device.last_check_at %}{{ device.last_check_at|timesince }} ago{% if device.last_down_reason %} (failed: {{ device.last_down_reason }}){% endif %}{% else %}not yet{% endif %}</dd>
+      {% endif %}
+    </dl>
+  </div>
+  <div class="col-lg-6">
+    <h2 class="h5">Monitoring</h2>
+    <form method="post" class="border rounded p-3">
+      {% csrf_token %}
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="{{ form.monitored.html_name }}" id="{{ form.monitored.id_for_label }}"{% if form.monitored.value %} checked{% endif %}>
+        <label class="form-check-label" for="{{ form.monitored.id_for_label }}">{{ form.monitored.label }}</label>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.check_port.id_for_label }}">{{ form.check_port.label }}</label>
+        <input class="form-control{% if form.check_port.errors %} is-invalid{% endif %}" type="number" min="1" max="65535"
+               name="{{ form.check_port.html_name }}" id="{{ form.check_port.id_for_label }}" value="{{ form.check_port.value|default_if_none:'' }}" placeholder="empty: ping">
+        {% for error in form.check_port.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+        <div class="form-text">{{ form.check_port.help_text }} Windows PCs often drop ping: try 445 or 3389.</div>
+      </div>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+  </div>
+</div>
+
+<h2 class="h5 mt-4">Alerts</h2>
+{% include "inventory/_alert_table.html" with show_device=False %}
+{% endblock %}

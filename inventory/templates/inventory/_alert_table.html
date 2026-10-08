@@ -1,0 +1,20 @@
+{% if alerts %}
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead><tr><th>When</th>{% if show_device %}<th>Device</th>{% endif %}<th></th><th>Message</th><th>Email</th></tr></thead>
+    <tbody>
+      {% for alert in alerts %}
+      <tr>
+        <td title="{{ alert.created_at }}">{{ alert.created_at|date:"d M H:i" }}</td>
+        {% if show_device %}<td><a href="{% url 'device-detail' alert.device.pk %}">{{ alert.device }}</a></td>{% endif %}
+        <td>{% if alert.kind == "down" %}<span class="badge text-bg-danger">Down</span>{% else %}<span class="badge text-bg-success">Back up</span>{% endif %}</td>
+        <td>{{ alert.message }}</td>
+        <td class="small">{% if alert.email_error %}<span class="text-danger" title="{{ alert.email_error }}">failed</span>{% elif alert.emailed_to %}{{ alert.emailed_to }}{% else %}<span class="text-body-secondary">not sent</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-body-secondary">No alerts.</p>
+{% endif %}

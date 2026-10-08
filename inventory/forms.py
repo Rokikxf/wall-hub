@@ -2,6 +2,16 @@ import ipaddress
 
 from django import forms
 
+from inventory.models import Device
+
+
+class MonitoringForm(forms.ModelForm):
+    class Meta:
+        model = Device
+        fields = ["monitored", "check_port"]
+        labels = {"monitored": "Monitor this device", "check_port": "Check TCP port"}
+
+
 # The same limits wall-scan enforces, checked here so the user gets a clear message
 # before a scan is queued rather than a failed scan afterwards.
 LARGEST_PREFIX = 16

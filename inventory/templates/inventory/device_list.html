@@ -1,35 +1,45 @@
 {% extends "base.html" %}
 {% block title %}Devices{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="h3 mb-0">Devices <span class="text-body-secondary fs-5">{{ devices|length }}</span></h1>
   <a class="btn btn-primary" href="{% url 'scan-list' %}">Run a scan</a>
 </div>
-{% if devices %}
-<div class="table-responsive">
-  <table class="table table-sm table-hover align-middle">
-    <thead>
-      <tr><th>IP address</th><th>Hostname</th><th>MAC address</th><th>Vendor</th><th>Open ports</th><th>Last seen</th></tr>
-    </thead>
-    <tbody>
-      {% for device in devices %}
-      <tr>
-        <td class="font-monospace">{{ device.ip }}</td>
-        <td>{{ device.hostname|default:"—" }}</td>
-        <td class="font-monospace">{{ device.mac|default:"—" }}</td>
-        <td>{{ device.vendor|default:"—" }}</td>
-        <td>
-          {% if device.open_ports is None %}<span class="text-body-secondary">not scanned</span>
-          {% else %}{% for port in device.open_ports %}<span class="badge text-bg-light border" title="{{ port.service|default:'unknown service' }}">{{ port.port }}/{{ port.protocol }}{% if port.service %} {{ port.service }}{% endif %}</span> {% empty %}<span class="text-body-secondary">none</span>{% endfor %}
-          {% endif %}
-        </td>
-        <td title="{{ device.last_seen }}">{{ device.last_seen|timesince }} ago</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+{# Refreshed every 30 s, so health changes show up without reloading the page. #}
+<div id="device-table" hx-get="{% url 'device-list' %}" hx-trigger="every 30s" hx-select="#device-table" hx-swap="outerHTML">
+  <p class="text-body-secondary small mb-3">
+    {% if not monitored_count %}No devices are monitored. Open a device to turn monitoring on.
+    {% elif last_run %}{{ monitored_count }} monitored. Last health check {{ last_run.created_at|timesince }} ago:
+      {% if last_run.status == "ok" %}OK{% elif last_run.status == "running" %}running{% else %}<span class="text-danger">{{ last_run.get_status_display }}: {{ last_run.message }}</span>{% endif %}.
+    {% else %}{{ monitored_count }} monitored. Waiting for the first health check.{% endif %}
+  </p>
+  {% if devices %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead>
+        <tr><th>IP address</th><th>Hostname</th><th>Status</th><th>MAC address</th><th>Vendor</th><th>Open ports</th><th>Last seen</th></tr>
+      </thead>
+      <tbody>
+        {% for device in devices %}
+        <tr>
+          <td class="font-monospace"><a href="{% url 'device-detail' device.pk %}">{{ device.ip }}</a></td>
+          <td>{{ device.hostname|default:"—" }}</td>
+          <td>{% include "inventory/_health_badge.html" %}</td>
+          <td class="font-monospace">{{ device.mac|default:"—" }}</td>
+          <td>{{ device.vendor|default:"—" }}</td>
+          <td>
+            {% if device.open_ports is None %}<span class="text-body-secondary">not scanned</span>
+            {% else %}{% for port in device.open_ports %}<span class="badge text-bg-light border" title="{{ port.service|default:'unknown service' }}">{{ port.port }}/{{ port.protocol }}{% if port.service %} {{ port.service }}{% endif %}</span> {% empty %}<span class="text-body-secondary">none</span>{% endfor %}
+            {% endif %}
+          </td>
+          <td title="{{ device.last_seen }}">{{ device.last_seen|timesince }} ago</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-body-secondary">No devices yet. <a href="{% url 'scan-list' %}">Run a scan</a> to discover the devices on your network.</p>
+  {% endif %}
 </div>
-{% else %}
-<p class="text-body-secondary">No devices yet. <a href="{% url 'scan-list' %}">Run a scan</a> to discover the devices on your network.</p>
-{% endif %}
 {% endblock %}

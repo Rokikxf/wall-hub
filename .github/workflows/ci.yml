@@ -54,8 +54,9 @@ jobs:
         run: pytest
 
   # The whole stack as it runs on the VM: build the image, start web, worker,
-  # db and redis, then queue a real scan of 127.0.0.1 and wait for the worker
-  # to finish it with nmap.
+  # beat, db and redis. Then scan 127.0.0.1 for real (worker, wall-scan, nmap),
+  # monitor the device it finds, and run a real health check of it
+  # (worker, wall-healthcheck, ping).
   docker:
     runs-on: ubuntu-latest
     needs: test
@@ -67,6 +68,9 @@ jobs:
           cp .env.example .env
           sed -i "s/^DJANGO_SECRET_KEY=.*/DJANGO_SECRET_KEY=ci-$(openssl rand -hex 24)/" .env
           sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-$(openssl rand -hex 12)/" .env
+          # The worker shares the host's network, so the host decides whether
+          # unprivileged ping sockets are allowed (Ubuntu allows them by default).
+          sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
 
       - name: Start the stack
         run: docker compose up --build --detach --wait --wait-timeout 300
@@ -76,6 +80,16 @@ jobs:
 
       - name: End-to-end scan of 127.0.0.1
         run: docker compose exec -T web python manage.py scan 127.0.0.1 --wait --wait-timeout 300
+
+      - name: End-to-end health check of 127.0.0.1
+        run: |
+          docker compose exec -T web python manage.py shell -c "
+          from inventory.models import Device
+          found = Device.objects.filter(ip='127.0.0.1').update(monitored=True)
+          assert found == 1, f'the scan did not find 127.0.0.1 ({found})'
+          "
+          docker compose exec -T web python manage.py healthcheck --wait --wait-timeout 120 | tee healthcheck.out
+          grep -q "1 up, 0 down" healthcheck.out
 
       - name: Logs
         if: always()

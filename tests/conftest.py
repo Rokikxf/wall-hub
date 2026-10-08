@@ -3,6 +3,9 @@ import subprocess
 
 import pytest
 from django.conf import settings
+from django.utils import timezone
+
+from inventory.models import Device
 
 
 @pytest.fixture(scope="session")
@@ -39,6 +42,29 @@ def fake_tool(monkeypatch):
 
     configure.calls = []
     return configure
+
+
+@pytest.fixture
+def make_device(db):
+    """Create a Device: make_device("192.168.1.50", monitored=True)."""
+
+    def make(ip: str, **fields) -> Device:
+        now = timezone.now()
+        return Device.objects.create(ip=ip, first_seen=now, last_seen=now, **fields)
+
+    return make
+
+
+@pytest.fixture
+def healthcheck_doc(example):
+    """A valid wall-healthcheck document with the given result.checks."""
+
+    def build(*checks: dict) -> dict:
+        document = example("wall-healthcheck", "ok.json")
+        document["result"]["checks"] = list(checks)
+        return document
+
+    return build
 
 
 @pytest.fixture

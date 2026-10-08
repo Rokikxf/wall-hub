@@ -17,3 +17,11 @@ All notable changes to this project are documented here. The format follows
 - Docker Compose deployment (web, worker, PostgreSQL, Redis). The worker uses
   the host network, and nmap has raw-socket capabilities.
 - CI: tests on PostgreSQL, and an end-to-end scan through the Docker stack.
+- Monitoring with wall-healthcheck v0.1.0. Turn it on per device, by ping or
+  by a TCP port. Celery beat runs a check of all monitored devices every
+  minute, and runs never overlap. Health is shown on the device list, which
+  refreshes itself.
+- Alerts: a device is down after 2 failed checks in a row (configurable). One
+  DOWN and one BACK UP alert per outage, emailed through SMTP when configured.
+  Mail failures are recorded and never stop monitoring. Alerts page, and
+  `manage.py healthcheck --wait`.

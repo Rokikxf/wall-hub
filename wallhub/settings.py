@@ -133,3 +133,38 @@ WALL_SCAN_COMMAND = env("WALL_SCAN_COMMAND", "wall-scan")
 WALL_SCAN_PRIVILEGED = env_bool("WALL_SCAN_PRIVILEGED")
 WALL_SCAN_TIMEOUT_S = int(env("WALL_SCAN_TIMEOUT_S", "600"))
 WALL_DEFAULT_TARGETS = env("WALL_DEFAULT_TARGETS", "")
+
+# wall-healthcheck: monitoring of devices marked "monitored", started by Celery beat.
+WALL_HEALTHCHECK_COMMAND = env("WALL_HEALTHCHECK_COMMAND", "wall-healthcheck")
+WALL_HEALTHCHECK_INTERVAL_S = int(env("WALL_HEALTHCHECK_INTERVAL_S", "60"))
+WALL_HEALTHCHECK_ATTEMPTS = int(env("WALL_HEALTHCHECK_ATTEMPTS", "3"))
+WALL_HEALTHCHECK_TIMEOUT_MS = int(env("WALL_HEALTHCHECK_TIMEOUT_MS", "1000"))
+# Consecutive failed checks before a device counts as down and an alert is sent.
+WALL_ALERT_AFTER_FAILURES = int(env("WALL_ALERT_AFTER_FAILURES", "2"))
+WALL_ALERT_EMAILS = env_list("WALL_ALERT_EMAILS")
+# Base URL of the hub, for links in alert emails, e.g. http://192.168.1.10:8000
+WALL_HUB_URL = env("WALL_HUB_URL", "")
+
+CELERY_BEAT_SCHEDULE = {
+    "healthchecks": {
+        "task": "inventory.tasks.run_healthchecks",
+        "schedule": WALL_HEALTHCHECK_INTERVAL_S,
+        # A run still queued when the next is due is dropped, so a backlog
+        # cannot build up while no worker is running.
+        "options": {"expires": WALL_HEALTHCHECK_INTERVAL_S},
+    },
+}
+
+# Email for alerts: SMTP when EMAIL_HOST is set, otherwise printed to the log.
+EMAIL_HOST = env("EMAIL_HOST", "")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+    EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+    EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+    EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+    EMAIL_TIMEOUT = 15
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "wall-hub@localhost")
