@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from inventory.models import Alert, Device, HealthRun, Scan
+from inventory.models import Alert, Device, HealthRun, Licence, Location, Person, Scan
 
 
 @admin.register(Device)
@@ -27,3 +27,22 @@ class HealthRunAdmin(admin.ModelAdmin):
 class AlertAdmin(admin.ModelAdmin):
     list_display = ["created_at", "device", "kind", "emailed_to", "email_error"]
     list_filter = ["kind"]
+
+
+@admin.register(Person)
+class PersonAdmin(admin.ModelAdmin):
+    list_display = ["name", "department", "email"]
+    search_fields = ["name", "department", "email"]
+
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    list_display = ["name"]
+    search_fields = ["name"]
+
+
+@admin.register(Licence)
+class LicenceAdmin(admin.ModelAdmin):
+    list_display = ["name", "vendor", "seats", "expires"]
+    search_fields = ["name", "vendor"]
+    filter_horizontal = ["people", "devices"]

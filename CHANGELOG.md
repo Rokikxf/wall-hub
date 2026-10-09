@@ -25,3 +25,11 @@ All notable changes to this project are documented here. The format follows
   DOWN and one BACK UP alert per outage, emailed through SMTP when configured.
   Mail failures are recorded and never stop monitoring. Alerts page, and
   `manage.py healthcheck --wait`.
+- Asset management: people and locations, and asset details on devices (name,
+  type, asset tag, owner, location, make and model, serial number, purchase
+  date, warranty end).
+- Licences with key, seats and expiry, assigned to people and/or devices. Seat
+  use is counted and over-allocation shown.
+- Device search and filters (type, owner, location); the auto-refresh keeps them.
+- Expiring page, and a daily reminder email for warranties and licences ending
+  in 30, 7 or 1 days, or today (configurable).

@@ -1,10 +1,12 @@
 {% extends "base.html" %}
+{% load inventory_tags %}
 {% block title %}{{ device }}{% endblock %}
 {% block content %}
 <p><a href="{% url 'device-list' %}">← All devices</a></p>
 <h1 class="h3 mb-3">{{ device }} {% include "inventory/_health_badge.html" %}</h1>
 <div class="row g-4">
   <div class="col-lg-6">
+    <h2 class="h5">Network</h2>
     <dl class="row">
       <dt class="col-sm-4">IP address</dt><dd class="col-sm-8 font-monospace">{{ device.ip }}</dd>
       <dt class="col-sm-4">Hostname</dt><dd class="col-sm-8">{{ device.hostname|default:"—" }}</dd>
@@ -17,6 +19,22 @@
       {% if device.monitored %}
       <dt class="col-sm-4">Last check</dt><dd class="col-sm-8">{% if device.last_check_at %}{{ device.last_check_at|timesince }} ago{% if device.last_down_reason %} (failed: {{ device.last_down_reason }}){% endif %}{% else %}not yet{% endif %}</dd>
       {% endif %}
+    </dl>
+
+    <div class="d-flex justify-content-between align-items-center">
+      <h2 class="h5 mb-0">Asset</h2>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'device-edit' device.pk %}">Edit asset details</a>
+    </div>
+    <dl class="row mt-2">
+      <dt class="col-sm-4">Type</dt><dd class="col-sm-8">{{ device.get_kind_display }}</dd>
+      <dt class="col-sm-4">Asset tag</dt><dd class="col-sm-8">{{ device.asset_tag|default:"—" }}</dd>
+      <dt class="col-sm-4">Owner</dt><dd class="col-sm-8">{% if device.owner %}<a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a>{% else %}—{% endif %}</dd>
+      <dt class="col-sm-4">Location</dt><dd class="col-sm-8">{% if device.location %}<a href="{{ device.location.get_absolute_url }}">{{ device.location }}</a>{% else %}—{% endif %}</dd>
+      <dt class="col-sm-4">Make and model</dt><dd class="col-sm-8">{% if device.manufacturer or device.model_name %}{{ device.manufacturer }} {{ device.model_name }}{% else %}—{% endif %}</dd>
+      <dt class="col-sm-4">Serial number</dt><dd class="col-sm-8 font-monospace">{{ device.serial_number|default:"—" }}</dd>
+      <dt class="col-sm-4">Purchased</dt><dd class="col-sm-8">{{ device.purchase_date|date:"j M Y"|default:"—" }}</dd>
+      <dt class="col-sm-4">Warranty until</dt><dd class="col-sm-8">{% expiry_badge device.warranty_expires %}</dd>
+      {% if device.notes %}<dt class="col-sm-4">Notes</dt><dd class="col-sm-8">{{ device.notes|linebreaksbr }}</dd>{% endif %}
     </dl>
   </div>
   <div class="col-lg-6">
@@ -36,6 +54,13 @@
       </div>
       <button type="submit" class="btn btn-primary">Save</button>
     </form>
+
+    <h2 class="h5 mt-4">Licences</h2>
+    {% if licences %}
+    <ul>{% for licence in licences %}<li><a href="{{ licence.get_absolute_url }}">{{ licence }}</a> {% expiry_badge licence.expires "" %}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="text-body-secondary">None. Assign licences to this device on the licence's page.</p>
+    {% endif %}
   </div>
 </div>
 

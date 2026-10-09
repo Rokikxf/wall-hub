@@ -5,23 +5,48 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from kombu.exceptions import OperationalError
 
-from inventory.forms import MonitoringForm, ScanForm
+from inventory.forms import DeviceFilterForm, MonitoringForm, ScanForm
 from inventory.models import Alert, Device, HealthRun, Scan
 from inventory.tasks import run_scan
 
 log = logging.getLogger(__name__)
 
+SEARCH_FIELDS = [
+    "ip",
+    "hostname",
+    "name",
+    "mac",
+    "vendor",
+    "serial_number",
+    "asset_tag",
+    "owner__name",
+]
+
 
 @login_required
 def device_list(request):
-    devices = sorted(Device.objects.all(), key=lambda d: ipaddress.IPv4Address(d.ip))
+    form = DeviceFilterForm(request.GET or None)
+    devices = Device.objects.select_related("owner", "location")
+    if form.is_valid():
+        search = form.cleaned_data["q"].strip()
+        if search:
+            query = Q()
+            for field in SEARCH_FIELDS:
+                query |= Q(**{f"{field}__icontains": search})
+            devices = devices.filter(query)
+        for field in ["kind", "owner", "location"]:
+            if form.cleaned_data[field]:
+                devices = devices.filter(**{field: form.cleaned_data[field]})
     context = {
-        "devices": devices,
-        "monitored_count": sum(d.monitored for d in devices),
+        "form": form,
+        "filtered": form.is_bound,
+        "devices": sorted(devices, key=lambda d: ipaddress.IPv4Address(d.ip)),
+        "monitored_count": Device.objects.filter(monitored=True).count(),
         "last_run": HealthRun.objects.first(),
     }
     return render(request, "inventory/device_list.html", context)
@@ -41,7 +66,12 @@ def device_detail(request, pk):
             return redirect("device-detail", pk=device.pk)
     else:
         form = MonitoringForm(instance=device)
-    context = {"device": device, "form": form, "alerts": device.alerts.all()[:20]}
+    context = {
+        "device": device,
+        "form": form,
+        "alerts": device.alerts.all()[:20],
+        "licences": device.licences.all(),
+    }
     return render(request, "inventory/device_detail.html", context)
 
 

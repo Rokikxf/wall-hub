@@ -6,7 +6,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from inventory import alerts
+from inventory import alerts, expiry
 from inventory.ingest import apply_scan
 from inventory.models import Device, HealthRun, Scan
 from inventory.monitoring import MonitoringError, apply_checks
@@ -123,3 +123,9 @@ def run_healthchecks() -> str:
         alerts.send(alert)
     HealthRun.objects.filter(created_at__lt=now - HEALTH_RUN_RETENTION).delete()
     return run.status
+
+
+@shared_task
+def send_expiry_reminders() -> int:
+    """Email the daily digest of warranties and licences that expire soon."""
+    return expiry.send_reminders(timezone.localdate())

@@ -9,11 +9,15 @@
 </head>
 <body>
   <nav class="navbar navbar-expand bg-body-tertiary border-bottom mb-4">
-    <div class="container">
+    <div class="container flex-wrap">
       <a class="navbar-brand" href="{% url 'device-list' %}">wall-hub</a>
       {% if user.is_authenticated %}
-      <ul class="navbar-nav me-auto">
+      <ul class="navbar-nav me-auto flex-wrap">
         <li class="nav-item"><a class="nav-link" href="{% url 'device-list' %}">Devices</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'person-list' %}">People</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'location-list' %}">Locations</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'licence-list' %}">Licences</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'expiring' %}">Expiring</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'scan-list' %}">Scans</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'alert-list' %}">Alerts</a></li>
         {% if user.is_staff %}<li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Admin</a></li>{% endif %}

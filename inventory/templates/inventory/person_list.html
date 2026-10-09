@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}People{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">People <span class="text-body-secondary fs-5">{{ object_list|length }}</span></h1>
+  <a class="btn btn-primary" href="{% url 'person-add' %}">New person</a>
+</div>
+{% if object_list %}
+<div class="table-responsive">
+  <table class="table table-sm table-hover align-middle">
+    <thead><tr><th>Name</th><th>Department</th><th>Email</th><th>Devices</th><th>Licences</th></tr></thead>
+    <tbody>
+      {% for person in object_list %}
+      <tr>
+        <td><a href="{{ person.get_absolute_url }}">{{ person }}</a></td>
+        <td>{{ person.department|default:"—" }}</td>
+        <td>{{ person.email|default:"—" }}</td>
+        <td>{{ person.device_count }}</td>
+        <td>{{ person.licence_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-body-secondary">No people yet. Add the people who use your devices, then set them as owners on the device pages.</p>
+{% endif %}
+{% endblock %}

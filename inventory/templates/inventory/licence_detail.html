@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load inventory_tags %}
+{% block title %}{{ licence }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'licence-list' %}">← All licences</a></p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">{{ licence }}</h1>
+  <div>
+    <a class="btn btn-outline-primary" href="{% url 'licence-edit' licence.pk %}">Edit</a>
+    <a class="btn btn-outline-danger" href="{% url 'licence-delete' licence.pk %}">Delete</a>
+  </div>
+</div>
+{% if licence.over_allocated %}
+<div class="alert alert-danger">{{ licence.seats_used }} people and devices are assigned, but the licence has {{ licence.seats }} seat{{ licence.seats|pluralize }}.</div>
+{% endif %}
+<dl class="row">
+  <dt class="col-sm-3">Vendor</dt><dd class="col-sm-9">{{ licence.vendor|default:"—" }}</dd>
+  <dt class="col-sm-3">Seats</dt><dd class="col-sm-9">{{ licence.seats_used }} used of {% if licence.seats is None %}unlimited{% else %}{{ licence.seats }}{% endif %}</dd>
+  <dt class="col-sm-3">Purchased</dt><dd class="col-sm-9">{{ licence.purchase_date|date:"j M Y"|default:"—" }}</dd>
+  <dt class="col-sm-3">Expires</dt><dd class="col-sm-9">{% expiry_badge licence.expires "Does not expire" %}</dd>
+  <dt class="col-sm-3">Licence key</dt>
+  <dd class="col-sm-9">{% if licence.licence_key %}<details><summary>Show</summary><pre class="bg-body-tertiary p-2 mb-0">{{ licence.licence_key }}</pre></details>{% else %}—{% endif %}</dd>
+  {% if licence.notes %}<dt class="col-sm-3">Notes</dt><dd class="col-sm-9">{{ licence.notes|linebreaksbr }}</dd>{% endif %}
+</dl>
+<h2 class="h5">Assigned to people</h2>
+{% with people=licence.people.all %}
+{% if people %}<ul>{% for person in people %}<li><a href="{{ person.get_absolute_url }}">{{ person }}</a>{% if person.department %} <span class="text-body-secondary">({{ person.department }})</span>{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="text-body-secondary">Nobody.</p>{% endif %}
+{% endwith %}
+<h2 class="h5">Assigned to devices</h2>
+{% include "inventory/_device_table.html" with devices=licence.devices.all %}
+{% endblock %}

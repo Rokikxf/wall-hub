@@ -9,6 +9,9 @@ and shows them. So far it uses two tools:
   checks the devices you choose to monitor every minute, and emails you when
   one goes down or comes back up.
 
+On top of what the tools find, it records who owns each device and where it
+is, warranties, and software licences, and reminds you before they expire.
+
 Only scan networks you own or have written permission to scan.
 
 ## How it fits together
@@ -99,8 +102,35 @@ docker compose exec web python manage.py healthcheck --wait
 
 Ping uses Linux ping sockets and needs no capabilities. The host must allow
 them through `net.ipv4.ping_group_range`, because the worker shares the host's
-network. Current Ubuntu allows them by default; check with
-`sysctl net.ipv4.ping_group_range`, which should print `0 2147483647`.
+network. Ubuntu Server 24.04 has them **disabled** (`1 0`); without them every
+health check run fails with `icmp_not_permitted`. Allow them once on the VM:
+
+```bash
+echo 'net.ipv4.ping_group_range = 0 2147483647' | sudo tee /etc/sysctl.d/60-ping.conf
+sudo sysctl -p /etc/sysctl.d/60-ping.conf
+```
+
+## Assets: owners, locations, warranties and licences
+
+Scans find devices; people add the business details. These are never changed
+by a scan.
+
+- **People** and **Locations** have their own pages. Set a device's owner,
+  location, type, asset tag, make and model, serial number, purchase date and
+  warranty end date with **Edit asset details** on its page.
+- **Licences** have a key, a number of seats (empty means unlimited) and an
+  optional expiry date. Assign each one to people (for per-user licences such
+  as Microsoft 365) and to devices (for per-device licences). Each assignment
+  uses a seat. Over-allocation is shown, not blocked, so the list matches
+  reality. Keys are hidden until you click **Show** on the licence page.
+- **Devices** can be searched and filtered: by IP address, name, hostname,
+  MAC address, serial number, asset tag or owner, and by type, owner or location.
+- **Expiring** lists warranties and licences that end in the next 90 days or
+  ended in the last 90. Every morning (`WALL_EXPIRY_REMINDER_HOUR`), beat emails
+  a digest of whatever ends in exactly 30, 7 or 1 days, or today
+  (`WALL_EXPIRY_REMINDER_DAYS`), to `WALL_ALERT_EMAILS`. The rule depends only
+  on the date, so nothing is stored and nothing is sent twice. The logic is in
+  [inventory/expiry.py](inventory/expiry.py).
 
 ## Security notes
 
@@ -146,6 +176,8 @@ inventory/     the app: models, scan task, contract validation, views
   ingest.py      stores a scan and matches devices
   monitoring.py  health checks to device health and alerts
   alerts.py      alert emails
+  expiry.py      warranty and licence expiry, reminder emails
+  asset_views.py people, locations, licences and asset details pages
 contracts/     the hub's copies of the tool contracts
 templates/     base layout and login page
 static/vendor/ Bootstrap 5.3.8 and htmx 2.0.11, stored here so the hub works offline

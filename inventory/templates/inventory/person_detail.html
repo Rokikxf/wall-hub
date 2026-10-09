@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load inventory_tags %}
+{% block title %}{{ person }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'person-list' %}">← All people</a></p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">{{ person }}</h1>
+  <div>
+    <a class="btn btn-outline-primary" href="{% url 'person-edit' person.pk %}">Edit</a>
+    <a class="btn btn-outline-danger" href="{% url 'person-delete' person.pk %}">Delete</a>
+  </div>
+</div>
+<dl class="row">
+  <dt class="col-sm-3">Department</dt><dd class="col-sm-9">{{ person.department|default:"—" }}</dd>
+  <dt class="col-sm-3">Email</dt><dd class="col-sm-9">{% if person.email %}<a href="mailto:{{ person.email }}">{{ person.email }}</a>{% else %}—{% endif %}</dd>
+  {% if person.notes %}<dt class="col-sm-3">Notes</dt><dd class="col-sm-9">{{ person.notes|linebreaksbr }}</dd>{% endif %}
+</dl>
+<h2 class="h5">Devices</h2>
+{% include "inventory/_device_table.html" with devices=person.devices.all %}
+<h2 class="h5">Licences</h2>
+{% with licences=person.licences.all %}
+{% if licences %}
+<ul>{% for licence in licences %}<li><a href="{{ licence.get_absolute_url }}">{{ licence }}</a> {% expiry_badge licence.expires "" %}</li>{% endfor %}</ul>
+{% else %}<p class="text-body-secondary">No licences.</p>{% endif %}
+{% endwith %}
+{% endblock %}

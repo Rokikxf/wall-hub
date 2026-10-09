@@ -69,7 +69,7 @@ jobs:
           sed -i "s/^DJANGO_SECRET_KEY=.*/DJANGO_SECRET_KEY=ci-$(openssl rand -hex 24)/" .env
           sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-$(openssl rand -hex 12)/" .env
           # The worker shares the host's network, so the host decides whether
-          # unprivileged ping sockets are allowed (Ubuntu allows them by default).
+          # unprivileged ping sockets are allowed; the VM needs the same setting.
           sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
 
       - name: Start the stack

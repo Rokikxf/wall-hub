@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<p><a href="{{ cancel_url }}">← Back</a></p>
+<h1 class="h3 mb-3">{{ title }}</h1>
+<form method="post" class="col-lg-8">
+  {% csrf_token %}
+  {% include "inventory/_fields.html" %}
+  <button type="submit" class="btn btn-primary">Save</button>
+  <a class="btn btn-link" href="{{ cancel_url }}">Cancel</a>
+</form>
+{% endblock %}

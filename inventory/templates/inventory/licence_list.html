@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load inventory_tags %}
+{% block title %}Licences{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Licences <span class="text-body-secondary fs-5">{{ object_list|length }}</span></h1>
+  <a class="btn btn-primary" href="{% url 'licence-add' %}">New licence</a>
+</div>
+{% if object_list %}
+<div class="table-responsive">
+  <table class="table table-sm table-hover align-middle">
+    <thead><tr><th>Name</th><th>Vendor</th><th>Seats used</th><th>Expires</th></tr></thead>
+    <tbody>
+      {% for licence in object_list %}
+      <tr>
+        <td><a href="{{ licence.get_absolute_url }}">{{ licence }}</a></td>
+        <td>{{ licence.vendor|default:"—" }}</td>
+        <td>
+          {% if licence.seats is None %}{{ licence.used }} <span class="text-body-secondary">(unlimited)</span>
+          {% elif licence.used > licence.seats %}<span class="badge text-bg-danger" title="More assignments than seats">{{ licence.used }} / {{ licence.seats }}</span>
+          {% else %}{{ licence.used }} / {{ licence.seats }}{% endif %}
+        </td>
+        <td>{% expiry_badge licence.expires "Does not expire" %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-body-secondary">No licences yet.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,4 @@
+{% if status == "none" %}<span class="text-body-secondary">{{ none_text }}</span>
+{% elif status == "expired" %}<span class="badge text-bg-danger">Ended {{ date|date:"j M Y" }}</span>
+{% elif status == "soon" %}<span class="badge text-bg-warning">{{ date|date:"j M Y" }} · {% if days == 0 %}today{% else %}in {{ days }} day{{ days|pluralize }}{% endif %}</span>
+{% else %}{{ date|date:"j M Y" }}{% endif %}

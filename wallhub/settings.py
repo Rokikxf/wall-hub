@@ -7,6 +7,8 @@ variables; see .env.example for the full list.
 import os
 from pathlib import Path
 
+from celery.schedules import crontab
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -145,6 +147,11 @@ WALL_ALERT_EMAILS = env_list("WALL_ALERT_EMAILS")
 # Base URL of the hub, for links in alert emails, e.g. http://192.168.1.10:8000
 WALL_HUB_URL = env("WALL_HUB_URL", "")
 
+# Warranty and licence reminders: days before the date, and the hour (in TIME_ZONE).
+WALL_EXPIRY_REMINDER_DAYS = [int(d) for d in env_list("WALL_EXPIRY_REMINDER_DAYS", "30,7,1,0")]
+WALL_EXPIRY_REMINDER_HOUR = int(env("WALL_EXPIRY_REMINDER_HOUR", "8"))
+
+CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
     "healthchecks": {
         "task": "inventory.tasks.run_healthchecks",
@@ -152,6 +159,10 @@ CELERY_BEAT_SCHEDULE = {
         # A run still queued when the next is due is dropped, so a backlog
         # cannot build up while no worker is running.
         "options": {"expires": WALL_HEALTHCHECK_INTERVAL_S},
+    },
+    "expiry-reminders": {
+        "task": "inventory.tasks.send_expiry_reminders",
+        "schedule": crontab(hour=WALL_EXPIRY_REMINDER_HOUR, minute=0),
     },
 }
 
