@@ -11,9 +11,12 @@
 # db and redis publish their ports on 127.0.0.1 only: the host-network worker
 # reaches them there, and nothing else on the LAN can.
 
+# No shared `image:` name: web, worker and beat each get their own tag
+# (wall-hub-web, ...) built from the same cached layers. With a shared name,
+# Docker Engine 29 / Compose 2.40 build the three in parallel and fail with
+# 'image "wall-hub:latest": already exists'.
 x-app: &app
   build: .
-  image: wall-hub
   env_file: .env
   restart: unless-stopped
 
