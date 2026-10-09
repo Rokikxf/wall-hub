@@ -8,10 +8,11 @@ from devices behind a router, so neither alone is a reliable key. See find_devic
 from datetime import datetime
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from inventory.models import Device, Scan
+from inventory.models import Alert, Device, Scan
 
 
 def find_device(ip: str, mac: str | None) -> Device | None:
@@ -36,13 +37,15 @@ def find_device(ip: str, mac: str | None) -> Device | None:
     return None
 
 
-def record_device(found: dict[str, Any], scan: Scan, now: datetime) -> Device:
+def record_device(found: dict[str, Any], scan: Scan, now: datetime) -> tuple[Device, bool]:
     """Create or update the Device for one entry of result.devices.
 
-    Unknown values (null) do not erase known ones: an inventory keeps the last
-    known hostname or vendor even if one scan could not see it.
+    Returns the device and whether it is new. Unknown values (null) do not erase
+    known ones: an inventory keeps the last known hostname or vendor even if one
+    scan could not see it.
     """
-    device = find_device(found["ip"], found["mac"]) or Device(first_seen=now)
+    known = find_device(found["ip"], found["mac"])
+    device = known or Device(first_seen=now)
     device.ip = found["ip"]
     if found["mac"]:
         device.mac = found["mac"]
@@ -55,20 +58,45 @@ def record_device(found: dict[str, Any], scan: Scan, now: datetime) -> Device:
     device.last_seen = now
     device.last_scan = scan
     device.save()
-    return device
+    return device, known is None
 
 
-def apply_scan(scan: Scan, document: dict[str, Any]) -> None:
-    """Store a validated wall-scan document on the scan and update the inventory."""
+def describe_new_device(found: dict[str, Any]) -> str:
+    details = [f"MAC {found['mac']}" if found["mac"] else "no MAC address"]
+    details.append(found["vendor"] or "unknown vendor")
+    if found["hostname"]:
+        details.append(f"hostname {found['hostname']}")
+    if found["open_ports"]:
+        details.append("open ports " + ", ".join(str(p["port"]) for p in found["open_ports"]))
+    return f"New device on the network: {found['ip']} ({', '.join(details)})."
+
+
+def apply_scan(scan: Scan, document: dict[str, Any]) -> list[Alert]:
+    """Store a validated wall-scan document on the scan and update the inventory.
+
+    Returns an Alert for each device seen for the first time, for the caller to
+    email once the database work is done. The very first scan, into an empty
+    inventory, is the baseline: it reports nothing as new, or every device in the
+    office would be an alert.
+    """
     now = timezone.now()
+    new_devices = []
     with transaction.atomic():
+        baseline = not Device.objects.exists()
         scan.output = document
         scan.status = document["status"]
         scan.message = "; ".join(error["message"] for error in document["errors"])
         if document["result"] is not None:
             devices = document["result"]["devices"]
             for found in devices:
-                record_device(found, scan, now)
+                device, new = record_device(found, scan, now)
+                if new and not baseline and settings.WALL_ALERT_NEW_DEVICES:
+                    new_devices.append(
+                        Alert.objects.create(
+                            device=device, kind=Alert.Kind.NEW, message=describe_new_device(found)
+                        )
+                    )
             scan.device_count = len(devices)
         scan.finished_at = now
         scan.save()
+    return new_devices

@@ -151,6 +151,34 @@ WALL_HUB_URL = env("WALL_HUB_URL", "")
 WALL_EXPIRY_REMINDER_DAYS = [int(d) for d in env_list("WALL_EXPIRY_REMINDER_DAYS", "30,7,1,0")]
 WALL_EXPIRY_REMINDER_HOUR = int(env("WALL_EXPIRY_REMINDER_HOUR", "8"))
 
+# Automatic scans of the networks the worker is attached to (wall-scan --local).
+# Off unless set, because they scan whatever network the VM is plugged into.
+# Discovery sweep every N minutes (0: off), and a port scan at this hour (empty: off).
+WALL_AUTO_SCAN_INTERVAL_MIN = int(env("WALL_AUTO_SCAN_INTERVAL_MIN", "0") or 0)
+WALL_AUTO_PORT_SCAN_HOUR = env("WALL_AUTO_PORT_SCAN_HOUR", "")
+WALL_SCAN_EXCLUDE_INTERFACES = env_list("WALL_SCAN_EXCLUDE_INTERFACES")
+WALL_ALERT_NEW_DEVICES = env_bool("WALL_ALERT_NEW_DEVICES", True)
+
+
+def auto_scan_schedule(interval_min: int, port_scan_hour: str) -> dict:
+    """Beat entries for the automatic scans that are switched on."""
+    entries = {}
+    if interval_min > 0:
+        entries["auto-discovery"] = {
+            "task": "inventory.tasks.auto_scan",
+            "schedule": interval_min * 60,
+            "kwargs": {"ports": False},
+            "options": {"expires": interval_min * 60},
+        }
+    if port_scan_hour.strip():
+        entries["auto-port-scan"] = {
+            "task": "inventory.tasks.auto_scan",
+            "schedule": crontab(hour=int(port_scan_hour), minute=30),
+            "kwargs": {"ports": True},
+        }
+    return entries
+
+
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
     "healthchecks": {
@@ -164,6 +192,7 @@ CELERY_BEAT_SCHEDULE = {
         "task": "inventory.tasks.send_expiry_reminders",
         "schedule": crontab(hour=WALL_EXPIRY_REMINDER_HOUR, minute=0),
     },
+    **auto_scan_schedule(WALL_AUTO_SCAN_INTERVAL_MIN, WALL_AUTO_PORT_SCAN_HOUR),
 }
 
 # Email for alerts: SMTP when EMAIL_HOST is set, otherwise printed to the log.

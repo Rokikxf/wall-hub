@@ -3,8 +3,8 @@
 The web hub of the wall IT asset management system. It runs the wall-\* command
 line tools, checks their JSON output against the contracts, stores the results
 and shows them. So far it uses two tools:
-- [wall-scan](https://github.com/Rokikxf/wall-scan): you start a network scan,
-  and the hub keeps an inventory of the devices found;
+- [wall-scan](https://github.com/Rokikxf/wall-scan): the hub scans the networks it is on (by schedule or with one click),
+  and keeps an inventory of the devices found;
 - [wall-healthcheck](https://github.com/Rokikxf/wall-healthcheck): the hub
   checks the devices you choose to monitor every minute, and emails you when
   one goes down or comes back up.
@@ -70,6 +70,33 @@ the worker runs as an unprivileged user.
 Because the worker is on the host network, it reaches PostgreSQL and Redis on
 `127.0.0.1`. Their ports are published on the VM's loopback interface only,
 not on the LAN.
+
+## Automatic scans and new-device alerts
+
+You don't need to type addresses. **Scan local networks** on the Scans page
+(or `manage.py scan --local --wait`) runs `wall-scan --local`. That finds every
+private network the VM is directly attached to, and skips Docker's and VPN
+networks. Each scan's page lists the networks it actually scanned.
+
+To scan on a schedule, set in `.env`:
+
+| Setting                         | Effect                                                      |
+|---------------------------------|-------------------------------------------------------------|
+| `WALL_AUTO_SCAN_INTERVAL_MIN=60` | A quick discovery sweep (no ports) every 60 minutes: finds new devices fast. |
+| `WALL_AUTO_PORT_SCAN_HOUR=2`    | A full scan, with ports, every day at 02:30.                |
+| `WALL_SCAN_EXCLUDE_INTERFACES=enp0s3` | Never scan these interfaces' networks (here VirtualBox's NAT). |
+
+Both are off by default, because they scan whatever network the VM is plugged
+into: switch them on only where you are allowed to scan. An automatic scan does
+nothing while another scan is still running.
+
+**New devices:** when a scan sees a device for the first time, the hub creates
+a *New device* alert and emails `WALL_ALERT_EMAILS`. It sends one email per
+scan, listing every new device with its MAC address, vendor, hostname and open
+ports. The very first scan is the baseline and alerts nothing; otherwise every
+device in the office would be "new". Turn this off with
+`WALL_ALERT_NEW_DEVICES=false`. Phones and laptops with randomised MAC
+addresses can show up as new when their address changes.
 
 ## Monitoring and alerts
 

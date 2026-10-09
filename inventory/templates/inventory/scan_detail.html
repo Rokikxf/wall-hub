@@ -4,8 +4,9 @@
 <p><a href="{% url 'scan-list' %}">← All scans</a></p>
 <h1 class="h3 mb-3">Scan {{ scan.pk }} {% include "inventory/_status_badge.html" %}</h1>
 <dl class="row">
-  <dt class="col-sm-3">Targets</dt><dd class="col-sm-9 font-monospace">{{ scan.targets }}</dd>
-  <dt class="col-sm-3">Requested</dt><dd class="col-sm-9">{{ scan.created_at }}{% if scan.requested_by %} by {{ scan.requested_by }}{% endif %}</dd>
+  <dt class="col-sm-3">Targets</dt><dd class="col-sm-9 font-monospace">{{ scan.describe_targets }}{% if not scan.ports %} <span class="badge text-bg-light border font-sans-serif">discovery only</span>{% endif %}</dd>
+  {% if scan.scanned_networks %}<dt class="col-sm-3">Scanned</dt><dd class="col-sm-9 font-monospace">{{ scan.scanned_networks|join:", " }}</dd>{% endif %}
+  <dt class="col-sm-3">Requested</dt><dd class="col-sm-9">{{ scan.created_at }}{% if scan.automatic %} by the schedule{% elif scan.requested_by %} by {{ scan.requested_by }}{% endif %}</dd>
   <dt class="col-sm-3">Started</dt><dd class="col-sm-9">{{ scan.started_at|default:"—" }}</dd>
   <dt class="col-sm-3">Finished</dt><dd class="col-sm-9">{{ scan.finished_at|default:"—" }}</dd>
   {% if scan.output %}<dt class="col-sm-3">wall-scan</dt><dd class="col-sm-9">{{ scan.output.tool.version }} (schema {{ scan.output.schema_version }}){% if scan.output.result %}, {{ scan.output.result.engine.name }} {{ scan.output.result.engine.version }}{% endif %}</dd>{% endif %}

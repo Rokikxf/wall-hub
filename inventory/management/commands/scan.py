@@ -1,4 +1,4 @@
-"""manage.py scan TARGET... [--wait]: queue a wall-scan run from the command line.
+"""manage.py scan [TARGET...] [--local] [--wait]: queue a wall-scan run from the command line.
 
 With --wait it polls until a worker has finished the scan and exits non-zero unless
 the scan succeeded. That makes it usable as an end-to-end check of the whole stack:
@@ -18,20 +18,30 @@ class Command(BaseCommand):
     help = "Queue a wall-scan run; with --wait, wait for the result."
 
     def add_arguments(self, parser):
-        parser.add_argument("targets", nargs="+", help="IPv4 addresses or CIDR ranges")
+        parser.add_argument("targets", nargs="*", help="IPv4 addresses or CIDR ranges")
+        parser.add_argument(
+            "--local",
+            action="store_true",
+            help="also scan the networks the worker is attached to",
+        )
         parser.add_argument("--wait", action="store_true", help="wait for the scan to finish")
         parser.add_argument(
             "--wait-timeout", type=int, default=900, help="seconds to wait (default: 900)"
         )
 
     def handle(self, *args, **options):
-        form = ScanForm({"targets": " ".join(options["targets"])})
-        if not form.is_valid():
-            raise CommandError(form.errors["targets"][0])
-        scan = Scan.objects.create(targets=form.cleaned_data["targets"])
+        targets = ""
+        if options["targets"]:
+            form = ScanForm({"targets": " ".join(options["targets"])})
+            if not form.is_valid():
+                raise CommandError(form.errors["targets"][0])
+            targets = form.cleaned_data["targets"]
+        elif not options["local"]:
+            raise CommandError("Give at least one target, or --local.")
+        scan = Scan.objects.create(targets=targets, local=options["local"])
         if not queue_scan(scan):
             raise CommandError(scan.message)
-        self.stdout.write(f"Scan {scan.pk} queued: {scan.targets}")
+        self.stdout.write(f"Scan {scan.pk} queued: {scan.describe_targets()}")
         if not options["wait"]:
             return
 

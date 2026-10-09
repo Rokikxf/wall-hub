@@ -54,7 +54,14 @@ class Scan(models.Model):
 
     FINISHED = {Status.OK, Status.PARTIAL, Status.ERROR, Status.FAILED}
 
-    targets = models.CharField(max_length=500, help_text="Space-separated addresses and ranges")
+    targets = models.CharField(
+        max_length=500, blank=True, help_text="Space-separated addresses and ranges"
+    )
+    local = models.BooleanField(
+        default=False, help_text="Also scan the networks the scanner is attached to (--local)"
+    )
+    ports = models.BooleanField(default=True, help_text="Check open ports; off: discovery only")
+    automatic = models.BooleanField(default=False, help_text="Started by the schedule")
     status = models.CharField(max_length=10, choices=Status, default=Status.QUEUED)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -75,11 +82,23 @@ class Scan(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Scan {self.pk} of {self.targets} ({self.status})"
+        return f"Scan {self.pk} of {self.describe_targets()} ({self.status})"
 
     @property
     def is_finished(self) -> bool:
         return self.status in self.FINISHED
+
+    def describe_targets(self) -> str:
+        """What was asked for: typed targets and/or the local networks."""
+        parts = [self.targets] if self.targets else []
+        if self.local:
+            parts.append("local networks")
+        return " + ".join(parts)
+
+    @property
+    def scanned_networks(self) -> list[str]:
+        """What wall-scan actually scanned, including the networks --local found."""
+        return (self.output or {}).get("params", {}).get("targets", [])
 
 
 class Device(models.Model):
@@ -203,6 +222,7 @@ class Alert(models.Model):
     class Kind(models.TextChoices):
         DOWN = "down", "Down"
         UP = "up", "Back up"
+        NEW = "new", "New device"
 
     device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="alerts")
     kind = models.CharField(max_length=10, choices=Kind)

@@ -33,3 +33,12 @@ All notable changes to this project are documented here. The format follows
 - Device search and filters (type, owner, location); the auto-refresh keeps them.
 - Expiring page, and a daily reminder email for warranties and licences ending
   in 30, 7 or 1 days, or today (configurable).
+- Scans without typed addresses: "Scan local networks" and
+  `manage.py scan --local` use wall-scan v0.2.0 `--local`, which finds the
+  networks the worker is attached to. Optional automatic scans: a discovery
+  sweep every `WALL_AUTO_SCAN_INTERVAL_MIN` and a daily port scan at
+  `WALL_AUTO_PORT_SCAN_HOUR`; both off by default.
+- New-device alerts: a device seen for the first time creates a "New device"
+  alert, and each scan sends one email listing them. The first scan is the
+  baseline and alerts nothing.
+- compose.yaml works with Docker Engine 29 / Compose 2.40 (no shared image name).

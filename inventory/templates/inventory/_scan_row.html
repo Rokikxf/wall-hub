@@ -1,8 +1,11 @@
 <tr id="scan-{{ scan.pk }}"{% if not scan.is_finished %} hx-get="{% url 'scan-row' scan.pk %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   <td><a href="{% url 'scan-detail' scan.pk %}">{{ scan.pk }}</a></td>
-  <td class="font-monospace">{{ scan.targets }}</td>
+  <td>
+    <span class="font-monospace">{{ scan.describe_targets }}</span>{% if not scan.ports %} <span class="badge text-bg-light border">discovery only</span>{% endif %}
+    {% if scan.local and scan.scanned_networks %}<div class="small text-body-secondary font-monospace">{{ scan.scanned_networks|join:", " }}</div>{% endif %}
+  </td>
   <td>{% include "inventory/_status_badge.html" %}</td>
   <td>{{ scan.device_count|default_if_none:"—" }}</td>
   <td title="{{ scan.created_at }}">{{ scan.created_at|timesince }} ago</td>
-  <td>{{ scan.requested_by|default:"—" }}</td>
+  <td>{% if scan.automatic %}<span class="text-body-secondary">schedule</span>{% else %}{{ scan.requested_by|default:"—" }}{% endif %}</td>
 </tr>

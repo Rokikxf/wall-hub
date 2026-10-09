@@ -20,12 +20,14 @@ HEALTH_RUN_RETENTION = timedelta(days=7)
 
 
 def scan_command(scan: Scan) -> list[str]:
-    command = [
-        settings.WALL_SCAN_COMMAND,
-        *scan.targets.split(),
-        "--timeout-s",
-        str(settings.WALL_SCAN_TIMEOUT_S),
-    ]
+    command = [settings.WALL_SCAN_COMMAND, *scan.targets.split()]
+    if scan.local:
+        command.append("--local")
+        for interface in settings.WALL_SCAN_EXCLUDE_INTERFACES:
+            command += ["--exclude-interface", interface]
+    if not scan.ports:
+        command.append("--no-ports")
+    command += ["--timeout-s", str(settings.WALL_SCAN_TIMEOUT_S)]
     if settings.WALL_SCAN_PRIVILEGED:
         command.append("--privileged")
     return command
@@ -52,8 +54,29 @@ def run_scan(scan_id: int) -> str:
         return scan.status
 
     scan.stderr = stderr
-    apply_scan(scan, document)
+    new_devices = apply_scan(scan, document)
+    # Emails go out after the database work, so a slow mail server holds no locks.
+    alerts.send_new_devices(new_devices)
     return scan.status
+
+
+@shared_task
+def auto_scan(ports: bool) -> str:
+    """Scan the networks the worker is attached to, without typed targets.
+
+    Celery beat starts this when automatic scans are configured: a quick
+    discovery sweep every WALL_AUTO_SCAN_INTERVAL_MIN, and a port scan every
+    night at WALL_AUTO_PORT_SCAN_HOUR. It does nothing while another scan is
+    queued or running, so slow scans cannot pile up.
+    """
+    recent = timezone.now() - timedelta(seconds=settings.WALL_SCAN_TIMEOUT_S + SCAN_GRACE_S)
+    active = Scan.objects.filter(
+        status__in=[Scan.Status.QUEUED, Scan.Status.RUNNING], created_at__gte=recent
+    )
+    if active.exists():
+        return "another scan is in progress"
+    scan = Scan.objects.create(local=True, ports=ports, automatic=True)
+    return run_scan(scan.pk)
 
 
 def healthcheck_command(devices: list[Device]) -> list[str]:

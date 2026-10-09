@@ -95,23 +95,34 @@ def queue_scan(scan: Scan) -> bool:
     return True
 
 
+def start_scan(request, scan: Scan):
+    if queue_scan(scan):
+        messages.success(request, f"Scan of {scan.describe_targets()} queued.")
+    else:
+        messages.error(request, scan.message)
+    return redirect("scan-list")
+
+
 @login_required
 def scan_list(request):
+    form = ScanForm(initial={"targets": settings.WALL_DEFAULT_TARGETS})
     if request.method == "POST":
+        if "local" in request.POST:
+            # No targets to type: wall-scan finds the attached networks itself.
+            return start_scan(request, Scan.objects.create(local=True, requested_by=request.user))
         form = ScanForm(request.POST)
         if form.is_valid():
             scan = Scan.objects.create(
                 targets=form.cleaned_data["targets"], requested_by=request.user
             )
-            if queue_scan(scan):
-                messages.success(request, f"Scan of {scan.targets} queued.")
-            else:
-                messages.error(request, scan.message)
-            return redirect("scan-list")
-    else:
-        form = ScanForm(initial={"targets": settings.WALL_DEFAULT_TARGETS})
-    scans = Scan.objects.select_related("requested_by")[:50]
-    return render(request, "inventory/scan_list.html", {"form": form, "scans": scans})
+            return start_scan(request, scan)
+    context = {
+        "form": form,
+        "scans": Scan.objects.select_related("requested_by")[:50],
+        "auto_interval": settings.WALL_AUTO_SCAN_INTERVAL_MIN,
+        "auto_port_hour": settings.WALL_AUTO_PORT_SCAN_HOUR,
+    }
+    return render(request, "inventory/scan_list.html", context)
 
 
 @login_required

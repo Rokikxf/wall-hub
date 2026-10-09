@@ -2,18 +2,37 @@
 {% block title %}Scans{% endblock %}
 {% block content %}
 <h1 class="h3 mb-3">Scans</h1>
-<form method="post" class="row g-2 align-items-start mb-4">
-  {% csrf_token %}
-  <div class="col-md-6">
-    <label class="visually-hidden" for="{{ form.targets.id_for_label }}">Targets</label>
-    <input class="form-control{% if form.targets.errors %} is-invalid{% endif %}" type="text"
-           name="{{ form.targets.html_name }}" id="{{ form.targets.id_for_label }}"
-           value="{{ form.targets.value|default:'' }}" placeholder="192.168.1.0/24" required>
-    {% for error in form.targets.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-    <div class="form-text">{{ form.targets.help_text }}. Only scan networks you own or have permission to scan.</div>
+<div class="row g-4 mb-4">
+  <div class="col-lg-5">
+    <form method="post" class="border rounded p-3 h-100">
+      {% csrf_token %}
+      <h2 class="h6">Scan the local networks</h2>
+      <p class="small text-body-secondary mb-3">No addresses to type: wall-scan finds the networks the hub is attached to.
+        {% if auto_interval or auto_port_hour %}Automatic:
+          {% if auto_interval %}a quick sweep every {{ auto_interval }} min{% endif %}{% if auto_interval and auto_port_hour %}, {% endif %}{% if auto_port_hour %}a port scan daily at {{ auto_port_hour }}:30{% endif %}.
+        {% else %}Automatic scans are off (<code>WALL_AUTO_SCAN_INTERVAL_MIN</code>).{% endif %}</p>
+      <button type="submit" name="local" value="1" class="btn btn-primary">Scan local networks</button>
+    </form>
   </div>
-  <div class="col-auto"><button type="submit" class="btn btn-primary">Run scan</button></div>
-</form>
+  <div class="col-lg-7">
+    <form method="post" class="border rounded p-3 h-100">
+      {% csrf_token %}
+      <h2 class="h6">Scan specific addresses</h2>
+      <div class="row g-2 align-items-start">
+        <div class="col">
+          <label class="visually-hidden" for="{{ form.targets.id_for_label }}">Targets</label>
+          <input class="form-control{% if form.targets.errors %} is-invalid{% endif %}" type="text"
+                 name="{{ form.targets.html_name }}" id="{{ form.targets.id_for_label }}"
+                 value="{{ form.targets.value|default:'' }}" placeholder="192.168.1.0/24" required>
+          {% for error in form.targets.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+          <div class="form-text">{{ form.targets.help_text }}.</div>
+        </div>
+        <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Run scan</button></div>
+      </div>
+    </form>
+  </div>
+</div>
+<p class="small text-body-secondary">Only scan networks you own or have permission to scan.</p>
 {% if scans %}
 <div class="table-responsive">
   <table class="table table-sm align-middle">
