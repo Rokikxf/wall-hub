@@ -28,6 +28,7 @@ urlpatterns = [
     path("", views.device_list, name="device-list"),
     path("devices/<int:pk>/", views.device_detail, name="device-detail"),
     path("devices/<int:pk>/edit/", asset_views.DeviceAssetUpdate.as_view(), name="device-edit"),
+    path("devices/<int:pk>/wakes/", views.device_wakes, name="device-wakes"),
     *crud("people", "Person"),
     *crud("locations", "Location"),
     *crud("licences", "Licence"),

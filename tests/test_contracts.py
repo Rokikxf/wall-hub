@@ -60,8 +60,10 @@ MUST_FAIL = [
     ),
     ("wall-snmpinfo", "printer.json", "OID not dotted", {"result.system.object_id": "iso.3.6.1"}),
     ("wall-snmpinfo", "printer.json", "empty string not null", {"result.system.name": ""}),
-    ("wall-wol", "ok.json", "MAC with dashes", {"params.mac": "d4-81-d7-0a-1b-2c"}),
-    ("wall-wol", "ok.json", "zero packets requested", {"params.count": 0}),
+    ("wall-wol", "wake.json", "MAC with dashes", {"result.targets.0.mac": "3c-52-82-4a-1f-07"}),
+    ("wall-wol", "wake.json", "zero packets requested", {"params.count": 0}),
+    ("wall-wol", "wake.json", "no targets", {"result.targets": []}),
+    ("wall-wol", "wake.json", "IPv6 source address", {"result.source_ip": "fe80::1"}),
 ]
 
 # Changes a later 1.x version may make; the v1 contract must still accept them.
@@ -69,6 +71,7 @@ MUST_PASS = [
     ("wall-scan", "ok.json", "newer minor version", {"schema_version": "1.4"}),
     ("wall-scan", "ok.json", "new field on a device", {"result.devices.0.os_guess": "Linux 5.x"}),
     ("wall-snmpinfo", "printer.json", "new field in result", {"result.manufacturer": "HP"}),
+    ("wall-wol", "wake.json", "new field on a target", {"result.targets.0.secureon": False}),
     (
         "wall-healthcheck",
         "ok.json",

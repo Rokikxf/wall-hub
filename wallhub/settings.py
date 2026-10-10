@@ -171,6 +171,16 @@ WALL_SNMP_RETRIES = int(env("WALL_SNMP_RETRIES", "1"))
 # One email when a supply drops below this percentage, again only after a refill.
 WALL_TONER_ALERT_PERCENT = int(env("WALL_TONER_ALERT_PERCENT", "10"))
 
+# wall-wol: Wake-on-LAN. The packets go to the broadcast address of the network
+# a scan found the device on, else to WALL_WOL_BROADCAST. Then the device is
+# checked every WALL_WOL_CHECK_INTERVAL_S seconds for up to WALL_WOL_WAIT_S
+# (0: send without checking).
+WALL_WOL_COMMAND = env("WALL_WOL_COMMAND", "wall-wol")
+WALL_WOL_BROADCAST = env("WALL_WOL_BROADCAST", "255.255.255.255")
+WALL_WOL_PORT = int(env("WALL_WOL_PORT", "9"))
+WALL_WOL_WAIT_S = int(env("WALL_WOL_WAIT_S", "180") or 0)
+WALL_WOL_CHECK_INTERVAL_S = int(env("WALL_WOL_CHECK_INTERVAL_S", "15"))
+
 
 def auto_scan_schedule(interval_min: int, port_scan_hour: str) -> dict:
     """Beat entries for the automatic scans that are switched on."""

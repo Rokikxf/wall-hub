@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "wall-wol output",
-  "description": "Sends a Wake-on-LAN magic packet (6 bytes of 0xFF, then the MAC address 16 times) as a UDP broadcast. Usage: wall-wol MAC [--broadcast IP] [--port 9] [--count N]. status ok means the packets left this machine, not that the device woke up: Wake-on-LAN has no reply, so confirm with wall-healthcheck afterwards.",
+  "description": "Sends Wake-on-LAN magic packets to wake devices. Usage: wall-wol MAC [MAC ...] [--broadcast IP] [--port 9] [--count 3] [--interval-ms 100]. Sending a packet does not prove the device woke up: Wake-on-LAN has no reply.",
   "type": "object",
   "required": ["schema_version", "tool", "started_at", "duration_ms", "status", "errors", "params", "result"],
   "properties": {
@@ -97,39 +97,62 @@
       "type": "string",
       "format": "ipv4"
     },
+    "mac": {
+      "description": "MAC address, lowercase and colon-separated.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$"
+    },
     "params": {
-      "description": "The inputs of this run.",
+      "description": "The run-wide inputs. The MAC addresses are in result.targets.",
       "type": "object",
-      "required": ["mac", "broadcast", "port", "count"],
+      "required": ["broadcast", "port", "count", "interval_ms"],
       "properties": {
-        "mac": {
-          "description": "Target MAC address, normalised to lowercase and colon-separated whatever format was given on the command line.",
-          "type": "string",
-          "pattern": "^([0-9a-f]{2}:){5}[0-9a-f]{2}$"
-        },
         "broadcast": {
-          "$ref": "#/$defs/ipv4",
-          "description": "Destination address: the subnet's broadcast address (e.g. 192.168.1.255) or 255.255.255.255."
+          "description": "Destination IPv4 address of the packets: 255.255.255.255 (the default) or a private address, normally the broadcast address of the device's network, e.g. 192.168.1.255.",
+          "$ref": "#/$defs/ipv4"
         },
         "port": {
-          "description": "UDP destination port; 9 by convention, sometimes 7.",
+          "description": "Destination UDP port, normally 9.",
           "type": "integer",
           "minimum": 1,
           "maximum": 65535
         },
         "count": {
-          "description": "Copies to send. More than one, because a UDP broadcast can be lost.",
+          "description": "Magic packets sent to each MAC address.",
           "type": "integer",
           "minimum": 1
+        },
+        "interval_ms": {
+          "description": "Pause between rounds of packets, in milliseconds.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
     "result": {
       "type": "object",
-      "required": ["packets_sent"],
+      "required": ["source_ip", "targets"],
       "properties": {
+        "source_ip": {
+          "description": "The local IPv4 address the packets left from, chosen by the routing table for the destination. It shows which network they went out on: with several network cards, 255.255.255.255 leaves through the one with the default route, which may not be the device's network. null if the operating system does not say.",
+          "type": ["string", "null"],
+          "format": "ipv4"
+        },
+        "targets": {
+          "description": "One entry per MAC address, in the order given. A repeated address is listed, and sent packets, once.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/target" }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["mac", "packets_sent"],
+      "properties": {
+        "mac": { "$ref": "#/$defs/mac" },
         "packets_sent": {
-          "description": "Packets handed to the network stack. Equals params.count when status is ok.",
+          "description": "Magic packets handed to the network for this address: params.count, unless sending failed part-way (status is then partial). Wake-on-LAN has no reply, so this does not prove the device woke up.",
           "type": "integer",
           "minimum": 0
         }

@@ -2,7 +2,7 @@
 
 The web hub of the wall IT asset management system. It runs the wall-\* command
 line tools, checks their JSON output against the contracts, stores the results
-and shows them. So far it uses three tools:
+and shows them. It uses four tools:
 - [wall-scan](https://github.com/Rokikxf/wall-scan): the hub scans the networks it is on (by schedule or with one click),
   and keeps an inventory of the devices found;
 - [wall-healthcheck](https://github.com/Rokikxf/wall-healthcheck): the hub
@@ -10,7 +10,9 @@ and shows them. So far it uses three tools:
   one goes down or comes back up;
 - [wall-snmpinfo](https://github.com/Rokikxf/wall-snmpinfo): the hub reads the
   model, serial number and toner levels of printers and network equipment, and
-  emails you when a supply runs low.
+  emails you when a supply runs low;
+- [wall-wol](https://github.com/Rokikxf/wall-wol): the hub wakes computers with
+  Wake-on-LAN, then checks that they came on.
 
 On top of what the tools find, it records who owns each device and where it
 is, warranties, and software licences, and reminds you before they expire.
@@ -21,8 +23,9 @@ Only scan networks you own or have written permission to scan.
 
 ```
 browser ──► web (Django) ──┐                  ┌──► wall-scan ──► nmap ──────► LAN
-                           ├─► Redis ─► worker┤
-            beat (timer) ──┘                  └──► wall-healthcheck ──────────► LAN
+                           ├─► Redis ─► worker┼──► wall-healthcheck ──────────► LAN
+            beat (timer) ──┘                  ├──► wall-snmpinfo ─────────────► LAN
+                                              └──► wall-wol ──────────────────► LAN
                  web and worker share PostgreSQL
 ```
 
@@ -188,6 +191,35 @@ on that page reads it at once.
 - A failed read keeps the last successful result on the page, with the reason
   it failed.
 
+## Wake-on-LAN
+
+**Wake** on a device's page sends Wake-on-LAN magic packets to its MAC
+address. The button is greyed out for devices whose MAC address no scan has
+found: scans see MAC addresses only on the hub's own networks.
+
+- **Where the packets go:** to the broadcast address of the network a scan
+  found the device on, for example `10.180.103.255` for `10.180.103.0/24`.
+  This matters on a VM with several network adapters: `255.255.255.255` leaves
+  through the adapter with the default route, which on the lab VM is
+  VirtualBox's NAT adapter, so the LAN would never see the packets. When no
+  scan covered a network the device is in, the hub uses `WALL_WOL_BROADCAST`,
+  and says so on the page, with the address the packets left from.
+- **Did it wake up?** Wake-on-LAN has no reply. So after sending, the worker
+  checks the device every 15 seconds for up to `WALL_WOL_WAIT_S` (3 minutes),
+  the same way monitoring does: ping, or the TCP port set under **Monitoring**.
+  The page updates itself and shows *Awake, answered 45 seconds after the
+  packets were sent* or *No answer*. Windows blocks ping by default, so for a
+  Windows PC set a TCP port such as 445 first. Each check is its own short
+  task, so a booting PC does not hold up a worker.
+- Every wake is kept: who sent it, when, where the packets went and the result.
+  The last five are on the device's page.
+
+The device itself must be set up for Wake-on-LAN: in its firmware, its network
+card driver and, on Windows, with Fast Startup off. The
+[wall-wol README](https://github.com/Rokikxf/wall-wol#preparing-a-device)
+explains how. The hub must be on the same network (LAN or VLAN) as the device,
+because routers do not forward broadcasts.
+
 ## Security notes
 
 - The hub serves plain HTTP. That is fine on a trusted LAN, but HTTPS through
@@ -224,7 +256,9 @@ whole stack, and runs a real scan of 127.0.0.1 through web, Redis, the worker,
 wall-scan and nmap. It then monitors the device that scan found, and runs a real
 health check of it through wall-healthcheck, and an SNMP read through
 wall-snmpinfo (there is no SNMP agent on the runner, so it must end as a clean
-`snmp_timeout`).
+`snmp_timeout`). Last, it wakes the device: wall-wol sends the magic packets to a
+UDP socket the test opens on 127.0.0.1, which checks them byte for byte, and the
+follow-up check through Redis and the worker must find the device awake.
 
 ```
 wallhub/       Django project: settings, URLs, Celery app
@@ -235,6 +269,7 @@ inventory/     the app: models, scan task, contract validation, views
   monitoring.py  health checks to device health and alerts
   alerts.py      alert emails
   snmp.py        SNMP details on devices, low-supply alerts
+  wol.py         Wake-on-LAN: where the packets go, checks that the device woke
   expiry.py      warranty and licence expiry, reminder emails
   asset_views.py people, locations, licences and asset details pages
 contracts/     the hub's copies of the tool contracts

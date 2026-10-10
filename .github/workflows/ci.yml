@@ -56,7 +56,7 @@ jobs:
   # The whole stack as it runs on the VM: build the image, start web, worker,
   # beat, db and redis. Then scan 127.0.0.1 for real (worker, wall-scan, nmap),
   # monitor the device it finds, and run a real health check of it
-  # (worker, wall-healthcheck, ping).
+  # (worker, wall-healthcheck, ping), an SNMP read and a wake.
   docker:
     runs-on: ubuntu-latest
     needs: test
@@ -104,6 +104,38 @@ jobs:
           device.refresh_from_db()
           print(status, '|', device.snmp_message)
           assert status == 'error' and device.snmp_message.startswith('No SNMP response'), status
+          "
+
+      # A real wake of 127.0.0.1: wall-wol sends its packets to a UDP socket opened
+      # here (the worker shares the host's network, so this shell does too), and the
+      # bytes are checked. The follow-up check then goes through Redis to the worker,
+      # which finds the device up with wall-healthcheck.
+      - name: End-to-end wake of 127.0.0.1
+        run: |
+          docker compose exec -T worker python manage.py shell -c "
+          import socket, time
+          from django.conf import settings
+          from inventory.models import Device, Wake
+          from inventory.tasks import wake_device
+          listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          listener.bind(('127.0.0.1', 0))
+          listener.settimeout(10)
+          # The scan of 127.0.0.1 gives no network, so the fallback address is used.
+          settings.WALL_WOL_BROADCAST, settings.WALL_WOL_PORT = '127.0.0.1', listener.getsockname()[1]
+          device = Device.objects.get(ip='127.0.0.1')
+          device.mac = '02:00:00:00:00:01'
+          device.save()
+          wake = Wake.objects.create(device=device, mac=device.mac)
+          print('sent:', wake_device(wake.pk))
+          packet = listener.recv(200)
+          assert packet == bytes.fromhex('ff' * 6 + '020000000001' * 16), packet
+          for _ in range(90):
+              wake.refresh_from_db()
+              if wake.is_finished:
+                  break
+              time.sleep(1)
+          print(wake.status, '|', wake.checks, 'check(s) |', wake.message)
+          assert wake.status == 'awake', wake.status
           "
 
       - name: Logs

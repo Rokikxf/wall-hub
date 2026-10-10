@@ -271,6 +271,68 @@ class Alert(models.Model):
         return f"{self.device} {self.get_kind_display().lower()} at {self.created_at}"
 
 
+class Wake(models.Model):
+    """One Wake-on-LAN request: the magic packets sent, then whether the device answered.
+
+    The rules are in inventory/wol.py.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        WAITING = "waiting", "Waiting for the device"
+        AWAKE = "awake", "Awake"
+        NO_ANSWER = "no_answer", "No answer"
+        # Packets sent, but not checked: WALL_WOL_WAIT_S is 0, or the check could not run.
+        SENT = "sent", "Sent"
+        # wall-wol ran and reported an error: no packets were sent.
+        ERROR = "error", "Error"
+        # The hub got no valid document: wall-wol missing, crashed, or broke its contract.
+        FAILED = "failed", "Failed"
+
+    FINISHED = {Status.AWAKE, Status.NO_ANSWER, Status.SENT, Status.ERROR, Status.FAILED}
+
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="wakes")
+    mac = models.CharField(max_length=17, help_text="The MAC address the packets were for")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=10, choices=Status, default=Status.QUEUED)
+    broadcast = models.GenericIPAddressField(
+        protocol="IPv4", null=True, blank=True, help_text="Where the packets were sent"
+    )
+    source_ip = models.GenericIPAddressField(
+        protocol="IPv4", null=True, blank=True, help_text="The hub's address they left from"
+    )
+    sent_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    checks = models.PositiveIntegerField(default=0, help_text="Checks made after sending")
+    message = models.TextField(blank=True)
+    output = models.JSONField(null=True, blank=True, help_text="The validated wall-wol document")
+    stderr = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return f"Wake {self.pk} of {self.device} ({self.status})"
+
+    @property
+    def is_finished(self) -> bool:
+        return self.status in self.FINISHED
+
+    @property
+    def answered_after_s(self) -> int | None:
+        """Seconds from sending to the check that found the device awake."""
+        if self.status != self.Status.AWAKE or not (self.sent_at and self.finished_at):
+            return None
+        return round((self.finished_at - self.sent_at).total_seconds())
+
+
 class Licence(models.Model):
     """A software licence, assigned to people (per user) and/or devices (per device)."""
 

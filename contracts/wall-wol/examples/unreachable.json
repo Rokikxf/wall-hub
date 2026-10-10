@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "tool": {"name": "wall-wol", "version": "0.1.0"},
+  "started_at": "2026-10-10T19:07:03.552Z",
+  "duration_ms": 0,
+  "status": "error",
+  "errors": [
+    {
+      "code": "network_unreachable",
+      "message": "No route to 10.20.0.255: no network on this host reaches it (Network is unreachable).",
+      "target": null
+    }
+  ],
+  "params": {"broadcast": "10.20.0.255", "port": 9, "count": 3, "interval_ms": 100},
+  "result": null
+}

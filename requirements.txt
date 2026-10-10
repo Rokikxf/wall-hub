@@ -8,3 +8,4 @@ rfc3339-validator==0.1.4
 wall-scan @ git+https://github.com/Rokikxf/wall-scan@v0.2.0
 wall-healthcheck @ git+https://github.com/Rokikxf/wall-healthcheck@v0.1.0
 wall-snmpinfo @ git+https://github.com/Rokikxf/wall-snmpinfo@v0.1.0
+wall-wol @ git+https://github.com/Rokikxf/wall-wol@v0.1.0

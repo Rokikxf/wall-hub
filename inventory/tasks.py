@@ -6,9 +6,9 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from inventory import alerts, expiry, snmp
+from inventory import alerts, expiry, snmp, wol
 from inventory.ingest import apply_scan
-from inventory.models import Device, HealthRun, Scan
+from inventory.models import Device, HealthRun, Scan, Wake
 from inventory.monitoring import MonitoringError, apply_checks
 from inventory.runner import ToolRunError, run_tool
 
@@ -204,3 +204,58 @@ def read_all_snmp() -> int:
     for device in devices:
         read_snmp(device.pk)
     return len(devices)
+
+
+# wall-wol sends 3 rounds of packets 100 ms apart; this leaves plenty of room.
+WOL_TIME_LIMIT_S = 30
+
+
+def wol_command(wake: Wake) -> list[str]:
+    return [
+        settings.WALL_WOL_COMMAND,
+        wake.mac,
+        "--broadcast",
+        wake.broadcast,
+        "--port",
+        str(settings.WALL_WOL_PORT),
+    ]
+
+
+@shared_task
+def wake_device(wake_id: int) -> str:
+    """Send the magic packets for a queued Wake, then schedule the first check."""
+    wake = Wake.objects.select_related("device").get(pk=wake_id)
+    wake.broadcast, network = wol.wake_broadcast(wake.device)
+    try:
+        document, stderr = run_tool("wall-wol", wol_command(wake), WOL_TIME_LIMIT_S)
+    except ToolRunError as exc:
+        wake.stderr = exc.stderr
+        wol.finish(wake, Wake.Status.FAILED, str(exc), timezone.now())
+        wake.save()
+        return wake.status
+    wake.stderr = stderr
+    if wol.record_send(wake, document, network, timezone.now()):
+        check_wake.apply_async((wake.pk,), countdown=settings.WALL_WOL_CHECK_INTERVAL_S)
+    return wake.status
+
+
+@shared_task
+def check_wake(wake_id: int) -> str:
+    """Check once whether a woken device answers; schedule the next check until it is over.
+
+    Each check is its own task, queued with a countdown, so no worker sits idle
+    while the device boots.
+    """
+    wake = Wake.objects.select_related("device").get(pk=wake_id)
+    if wake.is_finished:
+        return wake.status
+    command = healthcheck_command([wake.device])
+    try:
+        document, _stderr = run_tool("wall-healthcheck", command, healthcheck_time_limit(1))
+    except ToolRunError as exc:
+        wol.finish(wake, Wake.Status.SENT, f"Not checked: {exc}", timezone.now())
+        wake.save()
+        return wake.status
+    if not wol.record_check(wake, document, timezone.now()):
+        check_wake.apply_async((wake.pk,), countdown=settings.WALL_WOL_CHECK_INTERVAL_S)
+    return wake.status

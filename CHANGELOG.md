@@ -49,3 +49,11 @@ All notable changes to this project are documented here. The format follows
   asset fields are filled in.
 - Supply low alerts: one email per device when supplies drop below
   `WALL_TONER_ALERT_PERCENT` (10%); a supply is reported again after a refill.
+- Wake-on-LAN with wall-wol v0.1.0: **Wake** on the device page. The packets go
+  to the broadcast address of the network a scan found the device on (else
+  `WALL_WOL_BROADCAST`), and the device is then checked every 15 seconds for up
+  to `WALL_WOL_WAIT_S` (3 minutes) to show whether it woke. Every wake is kept,
+  with who sent it and the result.
+- The wall-wol contract copy follows the released tool. The draft written
+  before the tool existed allowed one MAC address per run and had no
+  `source_ip`.

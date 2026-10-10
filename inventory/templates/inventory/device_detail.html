@@ -55,6 +55,8 @@
       <button type="submit" class="btn btn-primary">Save</button>
     </form>
 
+    {% include "inventory/_wake_section.html" %}
+
     <h2 class="h5 mt-4">Licences</h2>
     {% if licences %}
     <ul>{% for licence in licences %}<li><a href="{{ licence.get_absolute_url }}">{{ licence }}</a> {% expiry_badge licence.expires "" %}</li>{% endfor %}</ul>

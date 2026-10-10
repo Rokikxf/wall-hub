@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "tool": {"name": "wall-wol", "version": "0.1.0"},
+  "started_at": "2026-10-10T19:06:40.017Z",
+  "duration_ms": 100,
+  "status": "partial",
+  "errors": [
+    {
+      "code": "send_failed",
+      "message": "Could not send to 192.168.1.255:9: No buffer space available",
+      "target": null
+    }
+  ],
+  "params": {"broadcast": "192.168.1.255", "port": 9, "count": 3, "interval_ms": 100},
+  "result": {
+    "source_ip": "192.168.1.10",
+    "targets": [
+      {"mac": "3c:52:82:4a:1f:07", "packets_sent": 2},
+      {"mac": "d8:bb:c1:22:9e:40", "packets_sent": 1}
+    ]
+  }
+}

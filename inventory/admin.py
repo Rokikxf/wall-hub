@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from inventory.models import Alert, Device, HealthRun, Licence, Location, Person, Scan
+from inventory.models import Alert, Device, HealthRun, Licence, Location, Person, Scan, Wake
 
 
 @admin.register(Device)
@@ -27,6 +27,13 @@ class HealthRunAdmin(admin.ModelAdmin):
 class AlertAdmin(admin.ModelAdmin):
     list_display = ["created_at", "device", "kind", "emailed_to", "email_error"]
     list_filter = ["kind"]
+
+
+@admin.register(Wake)
+class WakeAdmin(admin.ModelAdmin):
+    list_display = ["created_at", "device", "mac", "status", "broadcast", "requested_by"]
+    list_filter = ["status"]
+    readonly_fields = ["created_at"]
 
 
 @admin.register(Person)
