@@ -42,3 +42,10 @@ All notable changes to this project are documented here. The format follows
   alert, and each scan sends one email listing them. The first scan is the
   baseline and alerts nothing.
 - compose.yaml works with Docker Engine 29 / Compose 2.40 (no shared image name).
+- SNMP details with wall-snmpinfo v0.1.0: model, serial number, uptime and
+  printer supply levels on each device page, read every 6 hours and with "Read
+  now". Automatic for printers and network equipment, and devices with a
+  printing port open; on or off per device. Empty model and serial number
+  asset fields are filled in.
+- Supply low alerts: one email per device when supplies drop below
+  `WALL_TONER_ALERT_PERCENT` (10%); a supply is reported again after a refill.

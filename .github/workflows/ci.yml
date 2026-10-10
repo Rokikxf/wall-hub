@@ -91,6 +91,21 @@ jobs:
           docker compose exec -T web python manage.py healthcheck --wait --wait-timeout 120 | tee healthcheck.out
           grep -q "1 up, 0 down" healthcheck.out
 
+      # No SNMP agent runs on the runner, so the read must end as a clean
+      # snmp_timeout: that proves wall-snmpinfo runs in the worker and its
+      # document passes the contract and is stored.
+      - name: End-to-end SNMP read of 127.0.0.1
+        run: |
+          docker compose exec -T worker python manage.py shell -c "
+          from inventory.models import Device
+          from inventory.tasks import read_snmp
+          device = Device.objects.get(ip='127.0.0.1')
+          status = read_snmp(device.pk)
+          device.refresh_from_db()
+          print(status, '|', device.snmp_message)
+          assert status == 'error' and device.snmp_message.startswith('No SNMP response'), status
+          "
+
       - name: Logs
         if: always()
         run: docker compose logs --no-color

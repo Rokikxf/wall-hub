@@ -1,0 +1,61 @@
+{% load inventory_tags %}
+<div class="d-flex justify-content-between align-items-center mt-4">
+  <h2 class="h5 mb-0">SNMP</h2>
+  <form method="post" class="d-flex gap-2 align-items-center">
+    {% csrf_token %}
+    <label class="small text-body-secondary" for="snmp_setting">Read with SNMP</label>
+    <select class="form-select form-select-sm w-auto" name="snmp_setting" id="snmp_setting">
+      <option value="auto"{% if snmp_setting == "auto" %} selected{% endif %}>Automatic ({% if device.reads_snmp %}on{% else %}off{% endif %} for this device)</option>
+      <option value="on"{% if snmp_setting == "on" %} selected{% endif %}>On</option>
+      <option value="off"{% if snmp_setting == "off" %} selected{% endif %}>Off</option>
+    </select>
+    <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+    <button type="submit" name="read_snmp" value="1" class="btn btn-sm btn-outline-primary">Read now</button>
+  </form>
+</div>
+<p class="small text-body-secondary mt-1">Automatic reads printers and network equipment, and devices with a printing port open, every few hours.</p>
+{% if not device.snmp_read_at %}
+<p class="text-body-secondary">Not read yet.</p>
+{% else %}
+<p class="small mb-2">Last read {{ device.snmp_read_at|timesince }} ago:
+  {% if device.snmp_status == "ok" %}<span class="text-success">OK</span>
+  {% elif device.snmp_status == "partial" %}<span class="text-warning-emphasis">partly ({{ device.snmp_message }})</span>
+  {% else %}<span class="text-danger">{{ device.snmp_message|default:device.snmp_status }}</span>{% endif %}
+  {% if device.snmp_status != "ok" and device.snmp_info %}<span class="text-body-secondary">Showing the last successful read.</span>{% endif %}
+</p>
+{% endif %}
+{% with info=device.snmp_info %}{% if info %}
+<div class="row g-4">
+  <div class="col-lg-6">
+    <dl class="row small">
+      <dt class="col-sm-4">Model</dt><dd class="col-sm-8">{{ info.model|default:"—" }}</dd>
+      <dt class="col-sm-4">Serial number</dt><dd class="col-sm-8 font-monospace">{{ info.serial_number|default:"—" }}</dd>
+      <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ info.system.name|default:"—" }}</dd>
+      <dt class="col-sm-4">Location</dt><dd class="col-sm-8">{{ info.system.location|default:"—" }}</dd>
+      <dt class="col-sm-4">Contact</dt><dd class="col-sm-8">{{ info.system.contact|default:"—" }}</dd>
+      <dt class="col-sm-4">Uptime</dt><dd class="col-sm-8">{{ info.system.uptime_s|duration }}</dd>
+      <dt class="col-sm-4">Description</dt><dd class="col-sm-8 text-break">{{ info.system.descr|default:"—" }}</dd>
+    </dl>
+  </div>
+  <div class="col-lg-6">
+    {% if info.supplies is None %}<p class="small text-body-secondary">No printer supplies (not a printer).</p>
+    {% else %}
+    <h3 class="h6">Supplies</h3>
+    {% for supply in info.supplies %}
+    <div class="mb-2">
+      <div class="d-flex justify-content-between small">
+        <span>{{ supply.description|default:supply.type }}</span>
+        <span>{% if supply.percent is not None %}{% if supply.percent < toner_threshold %}<strong class="text-danger">{{ supply.percent }}%</strong>{% else %}{{ supply.percent }}%{% endif %}{% elif supply.level_state == "some_remaining" %}some left{% else %}unknown{% endif %}</span>
+      </div>
+      {% if supply.percent is not None %}
+      <div class="progress" role="progressbar" aria-label="{{ supply.description }}" aria-valuenow="{{ supply.percent }}" aria-valuemin="0" aria-valuemax="100" style="height: .6rem">
+        <div class="progress-bar {{ supply.colorant|supply_bar }}" style="width: {{ supply.percent }}%"></div>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}<p class="small text-body-secondary">The printer lists no supplies.</p>
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endif %}{% endwith %}

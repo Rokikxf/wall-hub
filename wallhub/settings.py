@@ -159,6 +159,18 @@ WALL_AUTO_PORT_SCAN_HOUR = env("WALL_AUTO_PORT_SCAN_HOUR", "")
 WALL_SCAN_EXCLUDE_INTERFACES = env_list("WALL_SCAN_EXCLUDE_INTERFACES")
 WALL_ALERT_NEW_DEVICES = env_bool("WALL_ALERT_NEW_DEVICES", True)
 
+# wall-snmpinfo: model, serial number and supply levels of printers and network
+# equipment, read every WALL_SNMP_INTERVAL_H hours (0: only with "Read now").
+# The community string is WALL_SNMP_COMMUNITY in the environment, which the tool
+# reads itself, so it never appears on a command line.
+WALL_SNMPINFO_COMMAND = env("WALL_SNMPINFO_COMMAND", "wall-snmpinfo")
+WALL_SNMP_INTERVAL_H = int(env("WALL_SNMP_INTERVAL_H", "6") or 0)
+WALL_SNMP_VERSION = env("WALL_SNMP_VERSION", "2c")
+WALL_SNMP_TIMEOUT_MS = int(env("WALL_SNMP_TIMEOUT_MS", "2000"))
+WALL_SNMP_RETRIES = int(env("WALL_SNMP_RETRIES", "1"))
+# One email when a supply drops below this percentage, again only after a refill.
+WALL_TONER_ALERT_PERCENT = int(env("WALL_TONER_ALERT_PERCENT", "10"))
+
 
 def auto_scan_schedule(interval_min: int, port_scan_hour: str) -> dict:
     """Beat entries for the automatic scans that are switched on."""
@@ -193,6 +205,17 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour=WALL_EXPIRY_REMINDER_HOUR, minute=0),
     },
     **auto_scan_schedule(WALL_AUTO_SCAN_INTERVAL_MIN, WALL_AUTO_PORT_SCAN_HOUR),
+    **(
+        {
+            "snmp-reads": {
+                "task": "inventory.tasks.read_all_snmp",
+                "schedule": WALL_SNMP_INTERVAL_H * 3600,
+                "options": {"expires": WALL_SNMP_INTERVAL_H * 3600},
+            }
+        }
+        if WALL_SNMP_INTERVAL_H > 0
+        else {}
+    ),
 }
 
 # Email for alerts: SMTP when EMAIL_HOST is set, otherwise printed to the log.

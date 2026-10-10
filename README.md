@@ -2,12 +2,15 @@
 
 The web hub of the wall IT asset management system. It runs the wall-\* command
 line tools, checks their JSON output against the contracts, stores the results
-and shows them. So far it uses two tools:
+and shows them. So far it uses three tools:
 - [wall-scan](https://github.com/Rokikxf/wall-scan): the hub scans the networks it is on (by schedule or with one click),
   and keeps an inventory of the devices found;
 - [wall-healthcheck](https://github.com/Rokikxf/wall-healthcheck): the hub
   checks the devices you choose to monitor every minute, and emails you when
-  one goes down or comes back up.
+  one goes down or comes back up;
+- [wall-snmpinfo](https://github.com/Rokikxf/wall-snmpinfo): the hub reads the
+  model, serial number and toner levels of printers and network equipment, and
+  emails you when a supply runs low.
 
 On top of what the tools find, it records who owns each device and where it
 is, warranties, and software licences, and reminds you before they expire.
@@ -159,6 +162,32 @@ by a scan.
   on the date, so nothing is stored and nothing is sent twice. The logic is in
   [inventory/expiry.py](inventory/expiry.py).
 
+## SNMP: model, serial number and toner levels
+
+Every `WALL_SNMP_INTERVAL_H` hours (6 by default), the worker reads devices
+with `wall-snmpinfo`. A device's page then shows its model, serial number,
+name, location, uptime and, for printers, a level bar per supply. **Read now**
+on that page reads it at once.
+
+- **Which devices:** set on each device page. *Automatic* (the default) means
+  printers and network equipment, plus devices with a printing port open (9100,
+  631 or 515), which are printers not yet given a type. *On* or *Off* overrides
+  that.
+- **The community string** is `WALL_SNMP_COMMUNITY` in `.env` (often `public`).
+  The tool reads it from its environment, so it never appears on a command
+  line, in the output or in the database.
+- **Asset fields:** the model and serial number read over SNMP fill those
+  fields when they are empty. Values you entered are never overwritten.
+- **Low supplies:** when a supply drops below `WALL_TONER_ALERT_PERCENT` (10%),
+  you get one *Supply low* alert and email per device, listing every supply
+  that just ran low. A supply is reported again only after a reading at or
+  above the threshold, such as after a refill. A waste container with little
+  space left counts as *nearly full*. Supplies that report no number ("some
+  left") are never counted as low or refilled. The rules are in
+  [inventory/snmp.py](inventory/snmp.py).
+- A failed read keeps the last successful result on the page, with the reason
+  it failed.
+
 ## Security notes
 
 - The hub serves plain HTTP. That is fine on a trusted LAN, but HTTPS through
@@ -193,7 +222,9 @@ the hub is tested against exactly what the contract promises.
 CI runs the tests on PostgreSQL. It then builds the Docker image, starts the
 whole stack, and runs a real scan of 127.0.0.1 through web, Redis, the worker,
 wall-scan and nmap. It then monitors the device that scan found, and runs a real
-health check of it through wall-healthcheck.
+health check of it through wall-healthcheck, and an SNMP read through
+wall-snmpinfo (there is no SNMP agent on the runner, so it must end as a clean
+`snmp_timeout`).
 
 ```
 wallhub/       Django project: settings, URLs, Celery app
@@ -203,6 +234,7 @@ inventory/     the app: models, scan task, contract validation, views
   ingest.py      stores a scan and matches devices
   monitoring.py  health checks to device health and alerts
   alerts.py      alert emails
+  snmp.py        SNMP details on devices, low-supply alerts
   expiry.py      warranty and licence expiry, reminder emails
   asset_views.py people, locations, licences and asset details pages
 contracts/     the hub's copies of the tool contracts

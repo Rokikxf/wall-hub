@@ -6,7 +6,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from inventory import alerts, expiry
+from inventory import alerts, expiry, snmp
 from inventory.ingest import apply_scan
 from inventory.models import Device, HealthRun, Scan
 from inventory.monitoring import MonitoringError, apply_checks
@@ -152,3 +152,55 @@ def run_healthchecks() -> str:
 def send_expiry_reminders() -> int:
     """Email the daily digest of warranties and licences that expire soon."""
     return expiry.send_reminders(timezone.localdate())
+
+
+# wall-snmpinfo makes up to this many requests per device (system group,
+# identity tables, supplies, colours), each of which can time out.
+SNMP_REQUESTS = 8
+
+
+def snmpinfo_command(device: Device) -> list[str]:
+    # The community string is not an argument: wall-snmpinfo reads
+    # WALL_SNMP_COMMUNITY from the environment, which it inherits from the worker.
+    return [
+        settings.WALL_SNMPINFO_COMMAND,
+        device.ip,
+        "--snmp-version",
+        settings.WALL_SNMP_VERSION,
+        "--timeout-ms",
+        str(settings.WALL_SNMP_TIMEOUT_MS),
+        "--retries",
+        str(settings.WALL_SNMP_RETRIES),
+    ]
+
+
+def snmp_time_limit() -> int:
+    per_request_s = (settings.WALL_SNMP_RETRIES + 1) * settings.WALL_SNMP_TIMEOUT_MS / 1000
+    return math.ceil(SNMP_REQUESTS * per_request_s) + 30
+
+
+@shared_task
+def read_snmp(device_id: int) -> str:
+    """Read one device with wall-snmpinfo, store the result and send supply alerts."""
+    device = Device.objects.get(pk=device_id)
+    try:
+        document, _stderr = run_tool("wall-snmpinfo", snmpinfo_command(device), snmp_time_limit())
+    except ToolRunError as exc:
+        device.snmp_status = "failed"
+        device.snmp_message = str(exc)
+        device.snmp_read_at = timezone.now()
+        device.save(update_fields=["snmp_status", "snmp_message", "snmp_read_at"])
+        return device.snmp_status
+    with transaction.atomic():
+        low = snmp.apply_snmp(device, document, timezone.now())
+    alerts.send_low_supplies(device, low)
+    return device.snmp_status
+
+
+@shared_task
+def read_all_snmp() -> int:
+    """Read every device that reads_snmp, one after another. Returns how many."""
+    devices = [device for device in Device.objects.order_by("pk") if device.reads_snmp]
+    for device in devices:
+        read_snmp(device.pk)
+    return len(devices)

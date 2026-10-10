@@ -77,3 +77,16 @@ def send_new_devices(new: list[Alert]) -> None:
             lines.append(f"    {link}")
     lines += ["", "If you do not recognise a device, find out who connected it."]
     deliver(subject_text, "\n".join(lines) + FOOTER, new)
+
+
+def send_low_supplies(device: Device, low: list[Alert]) -> None:
+    """One email for the supplies of one device that have just run low."""
+    if not low:
+        return
+    count = f"{len(low)} supplies" if len(low) > 1 else "Supply"
+    subject_text = f"[wall] {count} low: {device} ({device.ip})"
+    lines = [alert.message for alert in low]
+    link = device_link(device)
+    if link:
+        lines += ["", link]
+    deliver(subject_text, "\n".join(lines) + FOOTER, low)

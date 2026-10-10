@@ -171,11 +171,43 @@ class Device(models.Model):
     warranty_expires = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
 
+    # SNMP details with wall-snmpinfo (see inventory/snmp.py).
+    snmp_enabled = models.BooleanField(
+        "read with SNMP",
+        null=True,
+        blank=True,
+        help_text="Empty: automatic, on for printers and network equipment",
+    )
+    snmp_status = models.CharField(max_length=10, blank=True, help_text="Empty: never read")
+    snmp_read_at = models.DateTimeField(null=True, blank=True)
+    snmp_info = models.JSONField(
+        null=True, blank=True, help_text="The result of the last successful read"
+    )
+    snmp_message = models.TextField(blank=True, help_text="What went wrong in the last read")
+    low_supplies = models.JSONField(
+        default=list, blank=True, help_text="Indexes of supplies already reported as low"
+    )
+
+    PRINTER_PORTS = {515, 631, 9100}  # LPD, IPP, JetDirect
+
     def __str__(self):
         return self.name or self.hostname or self.ip
 
     def get_absolute_url(self):
         return reverse("device-detail", args=[self.pk])
+
+    @property
+    def reads_snmp(self) -> bool:
+        """Whether the scheduled SNMP reads include this device.
+
+        An explicit setting wins. Otherwise: printers and network equipment, and
+        devices with a printing port open, which are printers not yet given a type.
+        """
+        if self.snmp_enabled is not None:
+            return self.snmp_enabled
+        if self.kind in (self.Kind.PRINTER, self.Kind.NETWORK):
+            return True
+        return any(port.get("port") in self.PRINTER_PORTS for port in self.open_ports or [])
 
     @property
     def check_target(self) -> str:
@@ -223,6 +255,7 @@ class Alert(models.Model):
         DOWN = "down", "Down"
         UP = "up", "Back up"
         NEW = "new", "New device"
+        SUPPLY = "supply", "Supply low"
 
     device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="alerts")
     kind = models.CharField(max_length=10, choices=Kind)

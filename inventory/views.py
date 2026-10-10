@@ -12,7 +12,7 @@ from kombu.exceptions import OperationalError
 
 from inventory.forms import DeviceFilterForm, MonitoringForm, ScanForm
 from inventory.models import Alert, Device, HealthRun, Scan
-from inventory.tasks import run_scan
+from inventory.tasks import read_snmp, run_scan
 
 log = logging.getLogger(__name__)
 
@@ -52,9 +52,24 @@ def device_list(request):
     return render(request, "inventory/device_list.html", context)
 
 
+SNMP_SETTINGS = {"auto": None, "on": True, "off": False}
+
+
 @login_required
 def device_detail(request, pk):
     device = get_object_or_404(Device, pk=pk)
+    if request.method == "POST" and "read_snmp" in request.POST:
+        try:
+            read_snmp.delay(device.pk)
+            messages.success(request, "SNMP read queued; refresh in a few seconds.")
+        except OperationalError as exc:
+            messages.error(request, f"Could not queue the SNMP read (is Redis running?): {exc}")
+        return redirect("device-detail", pk=device.pk)
+    if request.method == "POST" and request.POST.get("snmp_setting") in SNMP_SETTINGS:
+        device.snmp_enabled = SNMP_SETTINGS[request.POST["snmp_setting"]]
+        device.save(update_fields=["snmp_enabled"])
+        messages.success(request, "SNMP setting saved.")
+        return redirect("device-detail", pk=device.pk)
     if request.method == "POST":
         form = MonitoringForm(request.POST, instance=device)
         if form.is_valid():
@@ -71,6 +86,8 @@ def device_detail(request, pk):
         "form": form,
         "alerts": device.alerts.all()[:20],
         "licences": device.licences.all(),
+        "snmp_setting": next(k for k, v in SNMP_SETTINGS.items() if v == device.snmp_enabled),
+        "toner_threshold": settings.WALL_TONER_ALERT_PERCENT,
     }
     return render(request, "inventory/device_detail.html", context)
 
