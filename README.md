@@ -307,6 +307,7 @@ inventory/     the app: models, scan task, contract validation, views
   asset_views.py people, locations, licences and asset details pages
 contracts/     the hub's copies of the tool contracts
 templates/     base layout and login page
+static/css/    the hub's own styles on top of Bootstrap (hub.css), for light and dark
 static/js/     the network map page (network_map.js)
 static/vendor/ Bootstrap 5.3.8, htmx 2.0.11 and Cytoscape.js 3.34.3, stored here so the hub works offline
 ```

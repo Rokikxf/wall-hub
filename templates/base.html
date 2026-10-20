@@ -1,41 +1,75 @@
-{% load static %}<!doctype html>
-<html lang="en">
+{% load static inventory_tags %}<!doctype html>
+<html lang="en" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}wall-hub{% endblock %} · wall-hub</title>
+  <script>
+    // The theme before the first paint: the one chosen with the header button,
+    // otherwise the system's. Kept in this browser only.
+    (function () {
+      var chosen = null;
+      try { chosen = localStorage.getItem("wall-hub.theme"); } catch (error) {}
+      var dark = chosen ? chosen === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+    })();
+  </script>
   <link rel="stylesheet" href="{% static 'vendor/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/hub.css' %}">
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
 </head>
 <body>
-  <nav class="navbar navbar-expand bg-body-tertiary border-bottom mb-4">
-    <div class="container flex-wrap">
-      <a class="navbar-brand" href="{% url 'device-list' %}">wall-hub</a>
+  <header class="hub-header">
+    <div class="container">
+      <a class="hub-brand" href="{% if user.is_authenticated %}{% url 'device-list' %}{% else %}{% url 'login' %}{% endif %}">
+        {% include "_logo.svg" %}<span>wall<span class="hub-brand-sub">-hub</span></span>
+      </a>
       {% if user.is_authenticated %}
-      <ul class="navbar-nav me-auto flex-wrap">
-        <li class="nav-item"><a class="nav-link" href="{% url 'device-list' %}">Devices</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'network-map' %}">Map</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'person-list' %}">People</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'location-list' %}">Locations</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'licence-list' %}">Licences</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'expiring' %}">Expiring</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'scan-list' %}">Scans</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'alert-list' %}">Alerts</a></li>
-        {% if user.is_staff %}<li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Admin</a></li>{% endif %}
-      </ul>
-      <form method="post" action="{% url 'logout' %}" class="d-flex align-items-center gap-2">
-        {% csrf_token %}
-        <span class="navbar-text small">{{ user.get_username }}</span>
-        <button type="submit" class="btn btn-sm btn-outline-secondary">Log out</button>
-      </form>
+      <nav class="hub-nav" aria-label="Main">
+        {% nav_link "device-list" "Devices" "device" %}
+        {% nav_link "network-map" "Map" "network-map" %}
+        <span class="hub-nav-sep" aria-hidden="true"></span>
+        {% nav_link "person-list" "People" "person" %}
+        {% nav_link "location-list" "Locations" "location" %}
+        {% nav_link "licence-list" "Licences" "licence" %}
+        {% nav_link "expiring" "Expiring" "expiring" %}
+        <span class="hub-nav-sep" aria-hidden="true"></span>
+        {% nav_link "scan-list" "Scans" "scan" %}
+        {% nav_link "alert-list" "Alerts" "alert" %}
+        {% if user.is_staff %}{% nav_link "admin:index" "Admin" "admin" %}{% endif %}
+      </nav>
       {% endif %}
+      <div class="hub-header-end">
+        {% if user.is_authenticated %}
+        {% with down=down_count %}{% if down %}<a class="hub-alarm" href="{% url 'device-list' %}" title="Monitored devices that are down">{{ down }} down</a>{% endif %}{% endwith %}
+        {% endif %}
+        <button type="button" class="btn btn-header" id="theme-toggle" title="Switch between light and dark" aria-label="Switch between light and dark">
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1.5v11a5.5 5.5 0 0 1 0-11Z"/></svg>
+        </button>
+        {% if user.is_authenticated %}
+        <form method="post" action="{% url 'logout' %}" class="d-flex align-items-center gap-2 m-0">
+          {% csrf_token %}
+          <span class="d-none d-sm-inline">{{ user.get_username }}</span>
+          <button type="submit" class="btn btn-header">Log out</button>
+        </form>
+        {% endif %}
+      </div>
     </div>
-  </nav>
-  <main class="container">
+  </header>
+  <main class="container hub-main">
     {% for message in messages %}
     <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">{{ message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
+  <script>
+    document.getElementById("theme-toggle").addEventListener("click", function () {
+      var root = document.documentElement;
+      var theme = root.getAttribute("data-bs-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-bs-theme", theme);
+      try { localStorage.setItem("wall-hub.theme", theme); } catch (error) {}
+      document.dispatchEvent(new CustomEvent("hub:theme", { detail: theme }));
+    });
+  </script>
 </body>
 </html>

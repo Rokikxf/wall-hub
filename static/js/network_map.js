@@ -18,110 +18,117 @@
   const empty = document.getElementById("map-empty");
   const intro = details.innerHTML;
 
-  // Bootstrap's colours, so the map matches the rest of the hub.
-  const css = getComputedStyle(document.documentElement);
-  const colour = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
-  const c = {
-    up: colour("--bs-success", "#198754"),
-    down: colour("--bs-danger", "#dc3545"),
-    grey: colour("--bs-secondary", "#6c757d"),
-    text: colour("--bs-body-color", "#212529"),
-    bg: colour("--bs-body-bg", "#ffffff"),
-    box: colour("--bs-tertiary-bg", "#f8f9fa"),
-    border: colour("--bs-border-color", "#dee2e6"),
-    accent: colour("--bs-primary", "#0d6efd"),
-  };
+  /* Bootstrap's colours for the current theme, so the map matches the rest of the
+   * hub. Read again when the header's button switches between light and dark. */
+  function palette() {
+    const css = getComputedStyle(document.documentElement);
+    const colour = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+    return {
+      up: colour("--bs-success", "#198754"),
+      down: colour("--bs-danger", "#dc3545"),
+      grey: colour("--bs-secondary", "#6c757d"),
+      text: colour("--bs-body-color", "#212529"),
+      bg: colour("--bs-body-bg", "#ffffff"),
+      box: colour("--bs-tertiary-bg", "#f8f9fa"),
+      border: colour("--bs-border-color", "#dee2e6"),
+      accent: colour("--bs-primary", "#0d6efd"),
+    };
+  }
 
-  const style = [
-    {
-      selector: "node",
-      style: {
-        label: "data(label)",
-        "text-wrap": "wrap",
-        "text-valign": "bottom",
-        "text-margin-y": 4,
-        "font-size": 10,
-        color: c.text,
-        width: 24,
-        height: 24,
-        shape: "ellipse",
-        "background-color": c.bg,
-        "border-width": 2,
-        "border-color": c.grey,
+  function buildStyle() {
+    const c = palette();
+    return [
+      {
+        selector: "node",
+        style: {
+          label: "data(label)",
+          "text-wrap": "wrap",
+          "text-valign": "bottom",
+          "text-margin-y": 4,
+          "font-size": 10,
+          color: c.text,
+          width: 24,
+          height: 24,
+          shape: "ellipse",
+          "background-color": c.bg,
+          "border-width": 2,
+          "border-color": c.grey,
+        },
       },
-    },
-    {
-      selector: ".network",
-      style: {
-        shape: "round-rectangle",
-        "text-valign": "top",
-        "text-margin-y": -4,
-        "font-size": 12,
-        "font-weight": "bold",
-        "background-color": c.box,
-        "border-width": 1,
-        "border-color": c.border,
-        padding: 18,
+      {
+        selector: ".network",
+        style: {
+          shape: "round-rectangle",
+          "text-valign": "top",
+          "text-margin-y": -4,
+          "font-size": 12,
+          "font-weight": "bold",
+          "background-color": c.box,
+          "border-width": 1,
+          "border-color": c.border,
+          padding: 18,
+        },
       },
-    },
-    { selector: ".other", style: { "border-style": "dashed" } },
-    { selector: ".kind-computer", style: { shape: "round-rectangle" } },
-    { selector: ".kind-server", style: { shape: "rectangle" } },
-    { selector: ".kind-printer", style: { shape: "barrel" } },
-    { selector: ".kind-phone", style: { width: 18, height: 18 } },
-    { selector: ".kind-network, .gateway, .router", style: { shape: "diamond", width: 30, height: 30 } },
-    { selector: ".health-up", style: { "background-color": c.up, "border-color": c.up } },
-    { selector: ".health-down", style: { "background-color": c.down, "border-color": c.down } },
-    { selector: ".health-unknown", style: { "background-color": c.grey, "border-color": c.grey } },
-    { selector: ".stale", style: { opacity: 0.45, "border-style": "dashed" } },
-    { selector: ".synthetic", style: { "border-style": "dotted" } },
-    {
-      selector: ".hub",
-      style: {
-        shape: "star",
-        width: 46,
-        height: 46,
-        "background-color": c.accent,
-        "border-color": c.accent,
-        "font-size": 12,
-        "font-weight": "bold",
+      { selector: ".other", style: { "border-style": "dashed" } },
+      { selector: ".kind-computer", style: { shape: "round-rectangle" } },
+      { selector: ".kind-server", style: { shape: "rectangle" } },
+      { selector: ".kind-printer", style: { shape: "barrel" } },
+      { selector: ".kind-phone", style: { width: 18, height: 18 } },
+      { selector: ".kind-network, .gateway, .router", style: { shape: "diamond", width: 30, height: 30 } },
+      { selector: ".health-up", style: { "background-color": c.up, "border-color": c.up } },
+      { selector: ".health-down", style: { "background-color": c.down, "border-color": c.down } },
+      { selector: ".health-unknown", style: { "background-color": c.grey, "border-color": c.grey } },
+      { selector: ".stale", style: { opacity: 0.45, "border-style": "dashed" } },
+      { selector: ".synthetic", style: { "border-style": "dotted" } },
+      {
+        selector: ".hub",
+        style: {
+          shape: "star",
+          width: 46,
+          height: 46,
+          "background-color": c.accent,
+          "border-color": c.accent,
+          "font-size": 12,
+          "font-weight": "bold",
+        },
       },
-    },
-    {
-      selector: ".internet",
-      style: {
-        shape: "round-rectangle",
-        width: 80,
-        height: 34,
-        "text-valign": "center",
-        "text-margin-y": 0,
-        "background-color": c.box,
-        "border-style": "dashed",
+      {
+        selector: ".internet",
+        style: {
+          shape: "round-rectangle",
+          width: 80,
+          height: 34,
+          "text-valign": "center",
+          "text-margin-y": 0,
+          "background-color": c.box,
+          "border-style": "dashed",
+        },
       },
-    },
-    {
-      selector: "edge",
-      style: { width: 2, "line-color": c.border, "curve-style": "bezier" },
-    },
-    {
-      selector: "edge[label]",
-      style: {
-        label: "data(label)",
-        "font-size": 9,
-        color: c.grey,
-        "text-background-color": c.bg,
-        "text-background-opacity": 1,
-        "text-background-padding": 2,
+      {
+        selector: "edge",
+        style: { width: 2, "line-color": c.border, "curve-style": "bezier" },
       },
-    },
-    { selector: "node:selected", style: { "border-width": 4, "border-color": c.accent } },
-    {
-      selector: ".match",
-      style: { "underlay-color": c.accent, "underlay-opacity": 0.3, "underlay-padding": 8 },
-    },
-  ];
+      {
+        selector: "edge[label]",
+        style: {
+          label: "data(label)",
+          "font-size": 9,
+          color: c.grey,
+          "text-background-color": c.bg,
+          "text-background-opacity": 1,
+          "text-background-padding": 2,
+        },
+      },
+      { selector: "node:selected", style: { "border-width": 4, "border-color": c.accent } },
+      {
+        selector: ".match",
+        style: { "underlay-color": c.accent, "underlay-opacity": 0.3, "underlay-padding": 8 },
+      },
+    ];
+  }
 
-  const cy = cytoscape({ container, style, minZoom: 0.2, maxZoom: 3 });
+  const cy = cytoscape({ container, style: buildStyle(), minZoom: 0.2, maxZoom: 3 });
+  document.addEventListener("hub:theme", () => cy.style(buildStyle()));
 
   // --- positions ---
 

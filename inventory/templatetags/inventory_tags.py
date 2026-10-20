@@ -1,7 +1,31 @@
 from django import template
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+from django.utils.timesince import timesince
 
 register = template.Library()
+
+
+@register.simple_tag(takes_context=True)
+def nav_link(context, url_name, label, section):
+    """A header link, marked active on every page of its section.
+
+    section is the start of the section's URL names: "device" covers device-list,
+    device-detail and device-edit.
+    """
+    match = getattr(context.get("request"), "resolver_match", None)
+    current = (match.url_name or "") if match else ""
+    active = current == section or current.startswith(f"{section}-")
+    return format_html(
+        '<a class="nav-link{}" href="{}"{}>{}</a>',
+        " active" if active else "",
+        reverse(url_name),
+        mark_safe(' aria-current="page"') if active else "",
+        label,
+    )
+
 
 SOON_DAYS = 30
 
@@ -19,6 +43,12 @@ def expiry_badge(date, none_text="—"):
     else:
         status = "ok"
     return {"status": status, "date": date, "days": days}
+
+
+@register.filter
+def ago(moment):
+    """How long ago, in its largest unit only: "5 minutes ago", "2 days ago"."""
+    return f"{timesince(moment, depth=1)} ago" if moment else "never"
 
 
 @register.filter

@@ -1,48 +1,63 @@
 {% extends "base.html" %}
 {% block title %}Scans{% endblock %}
 {% block content %}
-<h1 class="h3 mb-3">Scans</h1>
+<div class="page-header">
+  <div>
+    <h1>Scans</h1>
+    <p class="page-subtitle">Only scan networks you own or have permission to scan.</p>
+  </div>
+</div>
 <div class="row g-4 mb-4">
   <div class="col-lg-5">
-    <form method="post" class="border rounded p-3 h-100">
-      {% csrf_token %}
-      <h2 class="h6">Scan the local networks</h2>
-      <p class="small text-body-secondary mb-3">No addresses to type: wall-scan finds the networks the hub is attached to.
-        {% if auto_interval or auto_port_hour %}Automatic:
-          {% if auto_interval %}a quick sweep every {{ auto_interval }} min{% endif %}{% if auto_interval and auto_port_hour %}, {% endif %}{% if auto_port_hour %}a port scan daily at {{ auto_port_hour }}:30{% endif %}.
-        {% else %}Automatic scans are off (<code>WALL_AUTO_SCAN_INTERVAL_MIN</code>).{% endif %}</p>
-      <button type="submit" name="local" value="1" class="btn btn-primary">Scan local networks</button>
-    </form>
+    <div class="card h-100">
+      <div class="card-header"><h2>Scan the local networks</h2></div>
+      <div class="card-body d-flex flex-column">
+        <p class="small muted">No addresses to type: wall-scan finds the networks the hub is attached to.
+          {% if auto_interval or auto_port_hour %}Automatic:
+            {% if auto_interval %}a quick sweep every {{ auto_interval }} min{% endif %}{% if auto_interval and auto_port_hour %}, {% endif %}{% if auto_port_hour %}a port scan daily at {{ auto_port_hour }}:30{% endif %}.
+          {% else %}Automatic scans are off (<code>WALL_AUTO_SCAN_INTERVAL_MIN</code>).{% endif %}</p>
+        <form method="post" class="mt-auto">
+          {% csrf_token %}
+          <button type="submit" name="local" value="1" class="btn btn-primary">Scan local networks</button>
+        </form>
+      </div>
+    </div>
   </div>
   <div class="col-lg-7">
-    <form method="post" class="border rounded p-3 h-100">
-      {% csrf_token %}
-      <h2 class="h6">Scan specific addresses</h2>
-      <div class="row g-2 align-items-start">
-        <div class="col">
-          <label class="visually-hidden" for="{{ form.targets.id_for_label }}">Targets</label>
-          <input class="form-control{% if form.targets.errors %} is-invalid{% endif %}" type="text"
-                 name="{{ form.targets.html_name }}" id="{{ form.targets.id_for_label }}"
-                 value="{{ form.targets.value|default:'' }}" placeholder="192.168.1.0/24" required>
-          {% for error in form.targets.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-          <div class="form-text">{{ form.targets.help_text }}.</div>
-        </div>
-        <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Run scan</button></div>
+    <div class="card h-100">
+      <div class="card-header"><h2>Scan specific addresses</h2></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="row g-2 align-items-start">
+            <div class="col">
+              <label class="visually-hidden" for="{{ form.targets.id_for_label }}">Targets</label>
+              <input class="form-control font-monospace{% if form.targets.errors %} is-invalid{% endif %}" type="text"
+                     name="{{ form.targets.html_name }}" id="{{ form.targets.id_for_label }}"
+                     value="{{ form.targets.value|default:'' }}" placeholder="192.168.1.0/24" required>
+              {% for error in form.targets.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+              <div class="form-text">{{ form.targets.help_text }}.</div>
+            </div>
+            <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Run scan</button></div>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   </div>
 </div>
-<p class="small text-body-secondary">Only scan networks you own or have permission to scan.</p>
-{% if scans %}
-<div class="table-responsive">
-  <table class="table table-sm align-middle">
-    <thead><tr><th>#</th><th>Targets</th><th>Status</th><th>Devices</th><th>Requested</th><th>By</th></tr></thead>
-    <tbody>
-      {% for scan in scans %}{% include "inventory/_scan_row.html" %}{% endfor %}
-    </tbody>
-  </table>
+<div class="card">
+  <div class="card-header"><h2>History</h2><span class="card-note">The last 50</span></div>
+  {% if scans %}
+  <div class="table-responsive">
+    <table class="table table-hub align-middle">
+      <thead><tr><th>#</th><th>Targets</th><th>Status</th><th>Devices</th><th>Requested</th><th>By</th></tr></thead>
+      <tbody>
+        {% for scan in scans %}{% include "inventory/_scan_row.html" %}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>No scans yet.</strong>Scan the local networks to find your devices.</div>
+  {% endif %}
 </div>
-{% else %}
-<p class="text-body-secondary">No scans yet.</p>
-{% endif %}
 {% endblock %}

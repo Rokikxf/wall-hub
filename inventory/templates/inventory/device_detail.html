@@ -2,72 +2,108 @@
 {% load inventory_tags %}
 {% block title %}{{ device }}{% endblock %}
 {% block content %}
-<p><a href="{% url 'device-list' %}">← All devices</a></p>
-<h1 class="h3 mb-3">{{ device }} {% include "inventory/_health_badge.html" %}</h1>
-<div class="row g-4">
-  <div class="col-lg-6">
-    <h2 class="h5">Network</h2>
-    <dl class="row">
-      <dt class="col-sm-4">IP address</dt><dd class="col-sm-8 font-monospace">{{ device.ip }}</dd>
-      <dt class="col-sm-4">Hostname</dt><dd class="col-sm-8">{{ device.hostname|default:"—" }}</dd>
-      <dt class="col-sm-4">MAC address</dt><dd class="col-sm-8 font-monospace">{{ device.mac|default:"—" }}</dd>
-      <dt class="col-sm-4">Vendor</dt><dd class="col-sm-8">{{ device.vendor|default:"—" }}</dd>
-      <dt class="col-sm-4">Open ports</dt>
-      <dd class="col-sm-8">{% if device.open_ports is None %}not scanned{% else %}{% for port in device.open_ports %}{{ port.port }}/{{ port.protocol }}{% if port.service %} ({{ port.service }}){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}none{% endfor %}{% endif %}</dd>
-      <dt class="col-sm-4">First seen</dt><dd class="col-sm-8">{{ device.first_seen }}</dd>
-      <dt class="col-sm-4">Last seen</dt><dd class="col-sm-8">{{ device.last_seen }}</dd>
-      {% if device.monitored %}
-      <dt class="col-sm-4">Last check</dt><dd class="col-sm-8">{% if device.last_check_at %}{{ device.last_check_at|timesince }} ago{% if device.last_down_reason %} (failed: {{ device.last_down_reason }}){% endif %}{% else %}not yet{% endif %}</dd>
-      {% endif %}
-    </dl>
-
-    <div class="d-flex justify-content-between align-items-center">
-      <h2 class="h5 mb-0">Asset</h2>
-      <a class="btn btn-sm btn-outline-primary" href="{% url 'device-edit' device.pk %}">Edit asset details</a>
+<div class="page-header">
+  <div>
+    <div class="crumbs"><a href="{% url 'device-list' %}">Devices</a> / <span class="font-monospace">{{ device.ip }}</span></div>
+    <h1>{{ device }} {% include "inventory/_health_badge.html" %}</h1>
+    <div class="page-meta">
+      {% if device.kind != "unknown" %}<span>{{ device.get_kind_display }}</span>{% endif %}
+      {% if device.vendor %}<span>{{ device.vendor }}</span>{% endif %}
+      {% if device.owner %}<span>Owner: <a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a></span>{% endif %}
+      {% if device.location %}<span>{{ device.location }}</span>{% endif %}
+      <span>Last seen {{ device.last_seen|ago }}</span>
     </div>
-    <dl class="row mt-2">
-      <dt class="col-sm-4">Type</dt><dd class="col-sm-8">{{ device.get_kind_display }}</dd>
-      <dt class="col-sm-4">Asset tag</dt><dd class="col-sm-8">{{ device.asset_tag|default:"—" }}</dd>
-      <dt class="col-sm-4">Owner</dt><dd class="col-sm-8">{% if device.owner %}<a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a>{% else %}—{% endif %}</dd>
-      <dt class="col-sm-4">Location</dt><dd class="col-sm-8">{% if device.location %}<a href="{{ device.location.get_absolute_url }}">{{ device.location }}</a>{% else %}—{% endif %}</dd>
-      <dt class="col-sm-4">Make and model</dt><dd class="col-sm-8">{% if device.manufacturer or device.model_name %}{{ device.manufacturer }} {{ device.model_name }}{% else %}—{% endif %}</dd>
-      <dt class="col-sm-4">Serial number</dt><dd class="col-sm-8 font-monospace">{{ device.serial_number|default:"—" }}</dd>
-      <dt class="col-sm-4">Purchased</dt><dd class="col-sm-8">{{ device.purchase_date|date:"j M Y"|default:"—" }}</dd>
-      <dt class="col-sm-4">Warranty until</dt><dd class="col-sm-8">{% expiry_badge device.warranty_expires %}</dd>
-      {% if device.notes %}<dt class="col-sm-4">Notes</dt><dd class="col-sm-8">{{ device.notes|linebreaksbr }}</dd>{% endif %}
-    </dl>
   </div>
-  <div class="col-lg-6">
-    <h2 class="h5">Monitoring</h2>
-    <form method="post" class="border rounded p-3">
-      {% csrf_token %}
-      <div class="form-check mb-3">
-        <input class="form-check-input" type="checkbox" name="{{ form.monitored.html_name }}" id="{{ form.monitored.id_for_label }}"{% if form.monitored.value %} checked{% endif %}>
-        <label class="form-check-label" for="{{ form.monitored.id_for_label }}">{{ form.monitored.label }}</label>
-      </div>
-      <div class="mb-3">
-        <label class="form-label" for="{{ form.check_port.id_for_label }}">{{ form.check_port.label }}</label>
-        <input class="form-control{% if form.check_port.errors %} is-invalid{% endif %}" type="number" min="1" max="65535"
-               name="{{ form.check_port.html_name }}" id="{{ form.check_port.id_for_label }}" value="{{ form.check_port.value|default_if_none:'' }}" placeholder="empty: ping">
-        {% for error in form.check_port.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-        <div class="form-text">{{ form.check_port.help_text }} Windows PCs often drop ping: try 445 or 3389.</div>
-      </div>
-      <button type="submit" class="btn btn-primary">Save</button>
-    </form>
-
-    {% include "inventory/_wake_section.html" %}
-
-    <h2 class="h5 mt-4">Licences</h2>
-    {% if licences %}
-    <ul>{% for licence in licences %}<li><a href="{{ licence.get_absolute_url }}">{{ licence }}</a> {% expiry_badge licence.expires "" %}</li>{% endfor %}</ul>
-    {% else %}
-    <p class="text-body-secondary">None. Assign licences to this device on the licence's page.</p>
-    {% endif %}
+  <div class="page-actions">
+    <a class="btn btn-outline-primary" href="{% url 'device-edit' device.pk %}">Edit asset details</a>
   </div>
 </div>
 
-{% include "inventory/_snmp_section.html" %}
+<div class="row g-4">
+  <div class="col-lg-7 section-gap">
+    <div class="card">
+      <div class="card-header"><h2>Network</h2></div>
+      <div class="card-body">
+        <dl class="dl-hub">
+          <dt>IP address</dt><dd class="font-monospace">{{ device.ip }}</dd>
+          <dt>Hostname</dt><dd>{{ device.hostname|default:"—" }}</dd>
+          <dt>MAC address</dt><dd class="font-monospace">{{ device.mac|default:"—" }}</dd>
+          <dt>Vendor</dt><dd>{{ device.vendor|default:"—" }}</dd>
+          <dt>Open ports</dt>
+          <dd>{% if device.open_ports is None %}<span class="muted">not scanned</span>{% else %}{% for port in device.open_ports %}<span class="status status-muted status-nodot me-1 mb-1">{{ port.port }}/{{ port.protocol }}{% if port.service %} {{ port.service }}{% endif %}</span>{% empty %}none{% endfor %}{% endif %}</dd>
+          <dt>First seen</dt><dd>{{ device.first_seen }}</dd>
+          <dt>Last seen</dt><dd>{{ device.last_seen }}</dd>
+          {% if device.monitored %}
+          <dt>Last check</dt><dd>{% if device.last_check_at %}{{ device.last_check_at|timesince }} ago{% if device.last_down_reason %} (failed: {{ device.last_down_reason }}){% endif %}{% else %}not yet{% endif %}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
 
-<h2 class="h5 mt-4">Alerts</h2>
-{% include "inventory/_alert_table.html" with show_device=False %}
+    <div class="card">
+      <div class="card-header">
+        <h2>Asset</h2>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'device-edit' device.pk %}">Edit</a>
+      </div>
+      <div class="card-body">
+        <dl class="dl-hub">
+          <dt>Type</dt><dd>{{ device.get_kind_display }}</dd>
+          <dt>Asset tag</dt><dd>{{ device.asset_tag|default:"—" }}</dd>
+          <dt>Owner</dt><dd>{% if device.owner %}<a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a>{% else %}—{% endif %}</dd>
+          <dt>Location</dt><dd>{% if device.location %}<a href="{{ device.location.get_absolute_url }}">{{ device.location }}</a>{% else %}—{% endif %}</dd>
+          <dt>Make and model</dt><dd>{% if device.manufacturer or device.model_name %}{{ device.manufacturer }} {{ device.model_name }}{% else %}—{% endif %}</dd>
+          <dt>Serial number</dt><dd class="font-monospace">{{ device.serial_number|default:"—" }}</dd>
+          <dt>Purchased</dt><dd>{{ device.purchase_date|date:"j M Y"|default:"—" }}</dd>
+          <dt>Warranty until</dt><dd>{% expiry_badge device.warranty_expires %}</dd>
+          {% if device.notes %}<dt>Notes</dt><dd>{{ device.notes|linebreaksbr }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5 section-gap">
+    <div class="card">
+      <div class="card-header"><h2>Monitoring</h2></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="{{ form.monitored.html_name }}" id="{{ form.monitored.id_for_label }}"{% if form.monitored.value %} checked{% endif %}>
+            <label class="form-check-label" for="{{ form.monitored.id_for_label }}">{{ form.monitored.label }}</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.check_port.id_for_label }}">{{ form.check_port.label }}</label>
+            <input class="form-control{% if form.check_port.errors %} is-invalid{% endif %}" type="number" min="1" max="65535"
+                   name="{{ form.check_port.html_name }}" id="{{ form.check_port.id_for_label }}" value="{{ form.check_port.value|default_if_none:'' }}" placeholder="empty: ping">
+            {% for error in form.check_port.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+            <div class="form-text">{{ form.check_port.help_text }} Windows PCs often drop ping: try 445 or 3389.</div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+      </div>
+    </div>
+
+    {% include "inventory/_wake_section.html" %}
+
+    <div class="card">
+      <div class="card-header"><h2>Licences</h2></div>
+      <div class="card-body">
+        {% if licences %}
+        <ul class="list-unstyled mb-0">{% for licence in licences %}<li class="d-flex justify-content-between gap-2 py-1"><a href="{{ licence.get_absolute_url }}">{{ licence }}</a> {% expiry_badge licence.expires "" %}</li>{% endfor %}</ul>
+        {% else %}
+        <p class="muted mb-0">None. Assign licences to this device on the licence's page.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section-gap mt-4">
+  {% include "inventory/_snmp_section.html" %}
+
+  <div class="card">
+    <div class="card-header"><h2>Alerts</h2></div>
+    {% include "inventory/_alert_table.html" with show_device=False %}
+  </div>
+</div>
 {% endblock %}

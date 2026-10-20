@@ -58,7 +58,13 @@ class DeviceAssetForm(BootstrapForm, forms.ModelForm):
 
 
 class DeviceFilterForm(BootstrapForm, forms.Form):
-    q = forms.CharField(required=False, label="Search")
+    q = forms.CharField(
+        required=False,
+        label="Search",
+        widget=forms.TextInput(
+            attrs={"type": "search", "placeholder": "Search: IP, name, MAC, serial, owner"}
+        ),
+    )
     kind = forms.ChoiceField(
         required=False, label="Type", choices=[("", "Any type"), *Device.Kind.choices]
     )

@@ -1,15 +1,16 @@
+{# A table of devices, to put inside a card. devices comes from views.WithDevices. #}
 {% if devices %}
 <div class="table-responsive">
-  <table class="table table-sm align-middle">
+  <table class="table table-hub table-hover align-middle">
     <thead><tr><th>IP address</th><th>Name</th><th>Type</th><th>Owner</th><th>Location</th><th>Status</th></tr></thead>
     <tbody>
       {% for device in devices %}
-      <tr>
+      <tr{% if device.monitored and device.health == "down" %} class="row-down"{% endif %}>
         <td class="font-monospace"><a href="{% url 'device-detail' device.pk %}">{{ device.ip }}</a></td>
-        <td>{{ device }}</td>
+        <td><a class="cell-main" href="{% url 'device-detail' device.pk %}">{{ device }}</a></td>
         <td>{{ device.get_kind_display }}</td>
-        <td>{% if device.owner %}<a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a>{% else %}—{% endif %}</td>
-        <td>{% if device.location %}<a href="{{ device.location.get_absolute_url }}">{{ device.location }}</a>{% else %}—{% endif %}</td>
+        <td>{% if device.owner %}<a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if device.location %}<a href="{{ device.location.get_absolute_url }}">{{ device.location }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% include "inventory/_health_badge.html" %}</td>
       </tr>
       {% endfor %}
@@ -17,5 +18,5 @@
   </table>
 </div>
 {% else %}
-<p class="text-body-secondary">No devices.</p>
+<div class="empty">No devices.</div>
 {% endif %}

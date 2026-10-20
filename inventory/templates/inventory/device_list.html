@@ -1,54 +1,93 @@
 {% extends "base.html" %}
+{% load inventory_tags %}
 {% block title %}Devices{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-2">
-  <h1 class="h3 mb-0">Devices <span class="text-body-secondary fs-5">{{ devices|length }}</span></h1>
-  <a class="btn btn-primary" href="{% url 'scan-list' %}">Run a scan</a>
+<div class="page-header">
+  <div>
+    <h1>Devices <span class="page-count">{{ devices|length }}{% if filtered %} shown{% endif %}</span></h1>
+    <p class="page-subtitle">Everything the scans have found, with health for the devices you monitor.</p>
+  </div>
+  <div class="page-actions"><a class="btn btn-primary" href="{% url 'scan-list' %}">Run a scan</a></div>
 </div>
-<form method="get" class="row g-2 align-items-end mb-3">
-  <div class="col-md-4"><label class="visually-hidden" for="{{ form.q.id_for_label }}">Search</label>{{ form.q }}</div>
-  <div class="col-sm-4 col-md-2">{{ form.kind }}</div>
-  <div class="col-sm-4 col-md-2">{{ form.owner }}</div>
-  <div class="col-sm-4 col-md-2">{{ form.location }}</div>
-  <div class="col-auto">
-    <button type="submit" class="btn btn-outline-secondary">Filter</button>
-    {% if filtered %}<a class="btn btn-link" href="{% url 'device-list' %}">Clear</a>{% endif %}
-  </div>
+
+<div id="device-stats" class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      <div class="stat">
+        <div class="stat-label">Devices</div>
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-note">{{ stats.monitored }} monitored</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="stat{% if stats.down %} stat-danger{% endif %}">
+        <div class="stat-label">Down</div>
+        <div class="stat-value">{{ stats.down }}</div>
+        <div class="stat-note">{% if stats.monitored %}{{ stats.up }} of {{ stats.monitored }} up{% else %}none monitored{% endif %}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <a class="stat" href="{% url 'alert-list' %}">
+        <div class="stat-label">Alerts, last 24 h</div>
+        <div class="stat-value">{{ stats.alerts_today }}</div>
+        <div class="stat-note">See all alerts</div>
+      </a>
+    </div>
+    <div class="col-6 col-lg-3">
+      <a class="stat" href="{% url 'scan-list' %}">
+        <div class="stat-label">Last scan</div>
+        <div class="stat-value fs-5 mt-1">{% if last_scan %}{{ last_scan.created_at|ago }}{% else %}never{% endif %}</div>
+        <div class="stat-note">{% if last_scan %}{{ last_scan.device_count|default:0 }} device{{ last_scan.device_count|pluralize }} found{% else %}Run one to find devices{% endif %}</div>
+      </a>
+    </div>
+</div>
+
+<form method="get" class="toolbar">
+  <label class="visually-hidden" for="{{ form.q.id_for_label }}">Search</label>
+  <div class="toolbar-search">{{ form.q }}</div>
+  {{ form.kind }}{{ form.owner }}{{ form.location }}
+  <button type="submit" class="btn btn-outline-secondary">Filter</button>
+  {% if filtered %}<a class="btn btn-link" href="{% url 'device-list' %}">Clear</a>{% endif %}
 </form>
-{# Refreshed every 30 s, with the same filters, so health changes show up without reloading. #}
-<div id="device-table" hx-get="{{ request.get_full_path }}" hx-trigger="every 30s" hx-select="#device-table" hx-swap="outerHTML">
-  <p class="text-body-secondary small mb-3">
-    {% if not monitored_count %}No devices are monitored. Open a device to turn monitoring on.
-    {% elif last_run %}{{ monitored_count }} monitored. Last health check {{ last_run.created_at|timesince }} ago:
-      {% if last_run.status == "ok" %}OK{% elif last_run.status == "running" %}running{% else %}<span class="text-danger">{{ last_run.get_status_display }}: {{ last_run.message }}</span>{% endif %}.
-    {% else %}{{ monitored_count }} monitored. Waiting for the first health check.{% endif %}
-  </p>
-  {% if devices %}
-  <div class="table-responsive">
-    <table class="table table-sm table-hover align-middle">
-      <thead>
-        <tr><th>IP address</th><th>Name</th><th>Status</th><th>Type</th><th>Owner</th><th>Location</th><th>MAC address</th><th>Last seen</th></tr>
-      </thead>
-      <tbody>
-        {% for device in devices %}
-        <tr>
-          <td class="font-monospace"><a href="{% url 'device-detail' device.pk %}">{{ device.ip }}</a></td>
-          <td>{% if device.name or device.hostname %}{{ device }}{% if device.name and device.hostname %}<div class="small text-body-secondary">{{ device.hostname }}</div>{% endif %}{% else %}—{% endif %}</td>
-          <td>{% include "inventory/_health_badge.html" %}</td>
-          <td>{% if device.kind != "unknown" %}{{ device.get_kind_display }}{% else %}—{% endif %}</td>
-          <td>{% if device.owner %}<a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a>{% else %}—{% endif %}</td>
-          <td>{% if device.location %}<a href="{{ device.location.get_absolute_url }}">{{ device.location }}</a>{% else %}—{% endif %}</td>
-          <td class="font-monospace small">{{ device.mac|default:"—" }}{% if device.vendor %}<div class="text-body-secondary font-sans-serif">{{ device.vendor }}</div>{% endif %}</td>
-          <td title="{{ device.last_seen }}">{{ device.last_seen|timesince }} ago</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+{# Refreshed every 30 s with the same filters, tiles included, so health changes show up #}
+{# without reloading. The filter form is outside it, so a refresh never eats typing. #}
+<div id="device-table" hx-get="{{ request.get_full_path }}" hx-trigger="every 30s" hx-select="#device-table" hx-select-oob="#device-stats" hx-swap="outerHTML">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-note">
+        {% if not monitored_count %}No devices are monitored. Open a device to turn monitoring on.
+        {% elif last_run %}{{ monitored_count }} monitored. Last health check {{ last_run.created_at|timesince }} ago:
+          {% if last_run.status == "ok" %}OK{% elif last_run.status == "running" %}running{% else %}<span class="text-danger-emphasis">{{ last_run.get_status_display }}: {{ last_run.message }}</span>{% endif %}.
+        {% else %}{{ monitored_count }} monitored. Waiting for the first health check.{% endif %}
+      </span>
+    </div>
+    {% if devices %}
+    <div class="table-responsive">
+      <table class="table table-hub table-hover align-middle">
+        <thead>
+          <tr><th>IP address</th><th>Name</th><th>Status</th><th>Type</th><th>Owner</th><th>Location</th><th>MAC address</th><th>Last seen</th></tr>
+        </thead>
+        <tbody>
+          {% for device in devices %}
+          <tr{% if device.monitored and device.health == "down" %} class="row-down"{% endif %}>
+            <td class="font-monospace"><a href="{% url 'device-detail' device.pk %}">{{ device.ip }}</a></td>
+            <td>{% if device.name or device.hostname %}<a class="cell-main" href="{% url 'device-detail' device.pk %}">{{ device }}</a>{% if device.name and device.hostname %}<span class="cell-sub">{{ device.hostname }}</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td>{% include "inventory/_health_badge.html" %}</td>
+            <td>{% if device.kind != "unknown" %}{{ device.get_kind_display }}{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td>{% if device.owner %}<a href="{{ device.owner.get_absolute_url }}">{{ device.owner }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td>{% if device.location %}<a href="{{ device.location.get_absolute_url }}">{{ device.location }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td><span class="font-monospace">{{ device.mac|default:"—" }}</span>{% if device.vendor %}<span class="cell-sub">{{ device.vendor }}</span>{% endif %}</td>
+            <td class="text-nowrap" title="{{ device.last_seen }}">{{ device.last_seen|ago }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% elif filtered %}
+    <div class="empty"><strong>No devices match.</strong><a href="{% url 'device-list' %}">Show all</a></div>
+    {% else %}
+    <div class="empty"><strong>No devices yet.</strong><a href="{% url 'scan-list' %}">Run a scan</a> to discover the devices on your network.</div>
+    {% endif %}
   </div>
-  {% elif filtered %}
-  <p class="text-body-secondary">No devices match. <a href="{% url 'device-list' %}">Show all</a></p>
-  {% else %}
-  <p class="text-body-secondary">No devices yet. <a href="{% url 'scan-list' %}">Run a scan</a> to discover the devices on your network.</p>
-  {% endif %}
 </div>
 {% endblock %}

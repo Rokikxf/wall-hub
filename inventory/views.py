@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -45,12 +45,29 @@ def device_list(request):
         for field in ["kind", "owner", "location"]:
             if form.cleaned_data[field]:
                 devices = devices.filter(**{field: form.cleaned_data[field]})
+    monitored = Q(monitored=True)
+    # Aliases must not be field names: "monitored" would shadow the field in the filters.
+    counts = Device.objects.aggregate(
+        n_total=Count("pk"),
+        n_monitored=Count("pk", filter=monitored),
+        n_up=Count("pk", filter=monitored & Q(health=Device.Health.UP)),
+        n_down=Count("pk", filter=monitored & Q(health=Device.Health.DOWN)),
+    )
+    stats = {name.removeprefix("n_"): value for name, value in counts.items()}
+    stats["alerts_today"] = Alert.objects.filter(
+        created_at__gte=timezone.now() - timedelta(hours=24)
+    ).count()
     context = {
         "form": form,
         "filtered": form.is_bound,
         "devices": sorted(devices, key=lambda d: ipaddress.IPv4Address(d.ip)),
-        "monitored_count": Device.objects.filter(monitored=True).count(),
+        "monitored_count": stats["monitored"],
+        "stats": stats,
         "last_run": HealthRun.objects.first(),
+        "last_scan": Scan.objects.for_list()
+        .filter(status__in=[Scan.Status.OK, Scan.Status.PARTIAL])
+        .order_by("-pk")
+        .first(),
     }
     return render(request, "inventory/device_list.html", context)
 

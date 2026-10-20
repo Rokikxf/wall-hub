@@ -1,15 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{{ location }}{% endblock %}
 {% block content %}
-<p><a href="{% url 'location-list' %}">← All locations</a></p>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 mb-0">{{ location }}</h1>
+<div class="page-header">
   <div>
+    <div class="crumbs"><a href="{% url 'location-list' %}">Locations</a> / {{ location }}</div>
+    <h1>{{ location }}</h1>
+    {% if location.notes %}<p class="page-subtitle">{{ location.notes|linebreaksbr }}</p>{% endif %}
+  </div>
+  <div class="page-actions">
     <a class="btn btn-outline-primary" href="{% url 'location-edit' location.pk %}">Edit</a>
     <a class="btn btn-outline-danger" href="{% url 'location-delete' location.pk %}">Delete</a>
   </div>
 </div>
-{% if location.notes %}<p>{{ location.notes|linebreaksbr }}</p>{% endif %}
-<h2 class="h5">Devices</h2>
-{% include "inventory/_device_table.html" %}
+<div class="card">
+  <div class="card-header"><h2>Devices</h2></div>
+  {% include "inventory/_device_table.html" %}
+</div>
 {% endblock %}

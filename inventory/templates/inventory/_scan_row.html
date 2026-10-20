@@ -1,11 +1,12 @@
+{% load inventory_tags %}
 <tr id="scan-{{ scan.pk }}"{% if not scan.is_finished %} hx-get="{% url 'scan-row' scan.pk %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
-  <td><a href="{% url 'scan-detail' scan.pk %}">{{ scan.pk }}</a></td>
+  <td><a class="cell-main" href="{% url 'scan-detail' scan.pk %}">{{ scan.pk }}</a></td>
   <td>
-    <span class="font-monospace">{{ scan.describe_targets }}</span>{% if not scan.ports %} <span class="badge text-bg-light border">discovery only</span>{% endif %}
-    {% if scan.local and scan.scanned_networks %}<div class="small text-body-secondary font-monospace">{{ scan.scanned_networks|join:", " }}</div>{% endif %}
+    {% if scan.targets %}<span class="font-monospace">{{ scan.targets }}</span>{% if scan.local %} + {% endif %}{% endif %}{% if scan.local %}local networks{% endif %}{% if not scan.ports %} <span class="status status-muted status-nodot ms-1">discovery only</span>{% endif %}
+    {% if scan.local and scan.scanned_networks %}<span class="cell-sub font-monospace">{{ scan.scanned_networks|join:", " }}</span>{% endif %}
   </td>
   <td>{% include "inventory/_status_badge.html" %}</td>
   <td>{{ scan.device_count|default_if_none:"—" }}</td>
-  <td title="{{ scan.created_at }}">{{ scan.created_at|timesince }} ago</td>
-  <td>{% if scan.automatic %}<span class="text-body-secondary">schedule</span>{% else %}{{ scan.requested_by|default:"—" }}{% endif %}</td>
+  <td class="text-nowrap" title="{{ scan.created_at }}">{{ scan.created_at|ago }}</td>
+  <td>{% if scan.automatic %}<span class="muted">schedule</span>{% else %}{{ scan.requested_by|default:"—" }}{% endif %}</td>
 </tr>

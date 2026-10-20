@@ -1,26 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Locations{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 mb-0">Locations <span class="text-body-secondary fs-5">{{ object_list|length }}</span></h1>
-  <a class="btn btn-primary" href="{% url 'location-add' %}">New location</a>
+<div class="page-header">
+  <div>
+    <h1>Locations <span class="page-count">{{ object_list|length }}</span></h1>
+    <p class="page-subtitle">Rooms, floors or sites where your devices are.</p>
+  </div>
+  <div class="page-actions"><a class="btn btn-primary" href="{% url 'location-add' %}">New location</a></div>
 </div>
-{% if object_list %}
-<div class="table-responsive">
-  <table class="table table-sm table-hover align-middle">
-    <thead><tr><th>Name</th><th>Devices</th><th>Notes</th></tr></thead>
-    <tbody>
-      {% for location in object_list %}
-      <tr>
-        <td><a href="{{ location.get_absolute_url }}">{{ location }}</a></td>
-        <td>{{ location.device_count }}</td>
-        <td class="text-body-secondary">{{ location.notes|truncatechars:80 }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card">
+  {% if object_list %}
+  <div class="table-responsive">
+    <table class="table table-hub table-hover align-middle">
+      <thead><tr><th>Name</th><th>Devices</th><th>Notes</th></tr></thead>
+      <tbody>
+        {% for location in object_list %}
+        <tr>
+          <td><a class="cell-main" href="{{ location.get_absolute_url }}">{{ location }}</a></td>
+          <td>{{ location.device_count }}</td>
+          <td class="muted">{{ location.notes|truncatechars:80 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>No locations yet.</strong>For example "Reception" or "Server cupboard".</div>
+  {% endif %}
 </div>
-{% else %}
-<p class="text-body-secondary">No locations yet, e.g. "Reception" or "Server cupboard".</p>
-{% endif %}
 {% endblock %}

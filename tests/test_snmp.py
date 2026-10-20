@@ -201,7 +201,7 @@ def test_device_page_shows_snmp_details(logged_in, make_device, printer_doc):
 
     assert "VNB3K12345" in content
     assert "10 days, 23 minutes" in content  # uptime 865432 s
-    assert '<strong class="text-danger">7%</strong>' in content
+    assert '<strong class="text-danger-emphasis">7%</strong>' in content  # below the threshold
     assert "some left" in content
     assert "Automatic (on for this device)" in content
 

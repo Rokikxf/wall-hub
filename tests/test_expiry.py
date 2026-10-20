@@ -126,7 +126,7 @@ def test_expiry_badge(monkeypatch, days, expected):
     )
 
     assert expected in html
-    assert ("badge" in html) == (days <= 30)
+    assert ('class="status' in html) == (days <= 30)  # highlighted only when soon
 
 
 def test_expiry_badge_without_a_date():

@@ -69,6 +69,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A new look: a dark header with grouped navigation that marks the current
+  page, and a red "down" count when monitored devices are down; light and
+  dark themes (following the system, with a switch in the header, the map
+  included); summary tiles on the devices page; page headers with
+  breadcrumbs; sections and tables in cards; soft status pills with a dot.
+  The device page shows its status and key facts at the top. Still no CDN:
+  one stylesheet, static/css/hub.css.
+- The device list's 30-second refresh also updates the summary tiles, but no
+  longer replaces the filter form, so it cannot wipe what is being typed.
 - The Scans page no longer loads each scan's full output, only the networks
   it scanned.
 - `Device.ip` is indexed, since every scan looks devices up by IP address.

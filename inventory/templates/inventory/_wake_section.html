@@ -1,34 +1,33 @@
 {% load inventory_tags %}
-<div id="wake-section"{% if wakes and not wakes.0.is_finished %} hx-get="{% url 'device-wakes' device.pk %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
-  <div class="d-flex justify-content-between align-items-center mt-4">
-    <h2 class="h5 mb-0">Wake-on-LAN</h2>
-    <form method="post" action="{% url 'device-detail' device.pk %}">
+<div id="wake-section" class="card"{% if wakes and not wakes.0.is_finished %} hx-get="{% url 'device-wakes' device.pk %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <div class="card-header">
+    <h2>Wake-on-LAN</h2>
+    <form method="post" action="{% url 'device-detail' device.pk %}" class="m-0">
       {% csrf_token %}
       <button type="submit" name="wake" value="1" class="btn btn-sm btn-outline-primary"{% if not device.mac %} disabled title="No MAC address known"{% endif %}>Wake</button>
     </form>
   </div>
   {% if not device.mac %}
-  <p class="small text-body-secondary mt-1">No MAC address is known for this device, so it cannot be woken. Scans find MAC addresses only on the hub's own networks.</p>
+  <div class="card-body"><p class="small muted mb-0">No MAC address is known for this device, so it cannot be woken. Scans find MAC addresses only on the hub's own networks.</p></div>
   {% elif not wakes %}
-  <p class="small text-body-secondary mt-1">Sends magic packets to {{ device.mac }}{% if wol_wait %}, then checks for up to {{ wol_wait|duration }} whether the device answers{% endif %}. Wake-on-LAN must be switched on in the device's firmware and network card.</p>
+  <div class="card-body"><p class="small muted mb-0">Sends magic packets to <span class="font-monospace">{{ device.mac }}</span>{% if wol_wait %}, then checks for up to {{ wol_wait|duration }} whether the device answers{% endif %}. Wake-on-LAN must be switched on in the device's firmware and network card.</p></div>
   {% endif %}
   {% if wakes %}
   <div class="table-responsive">
-    <table class="table table-sm small mt-2 mb-0">
-      <thead><tr><th>When</th><th>By</th><th>Sent to</th><th>Result</th></tr></thead>
+    <table class="table table-hub align-middle small">
+      <thead><tr><th>When</th><th>Sent to</th><th>Result</th></tr></thead>
       <tbody>
         {% for wake in wakes %}
         <tr>
-          <td title="{{ wake.created_at }}">{{ wake.created_at|timesince }} ago</td>
-          <td>{{ wake.requested_by|default:"—" }}</td>
-          <td class="font-monospace">{{ wake.broadcast|default:"—" }}{% if wake.source_ip %}<div class="text-body-secondary">from {{ wake.source_ip }}</div>{% endif %}</td>
+          <td class="text-nowrap" title="{{ wake.created_at }}">{{ wake.created_at|ago }}<span class="cell-sub">{{ wake.requested_by|default:"—" }}</span></td>
+          <td><span class="font-monospace">{{ wake.broadcast|default:"—" }}</span>{% if wake.source_ip %}<span class="cell-sub">from {{ wake.source_ip }}</span>{% endif %}</td>
           <td>
-            {% if wake.status == "awake" %}<span class="badge text-bg-success">Awake</span> answered {{ wake.answered_after_s|duration }} after the packets were sent
-            {% elif wake.status == "waiting" %}<span class="badge text-bg-primary"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Waiting for the device</span>{% if wake.checks %} {{ wake.checks }} check{{ wake.checks|pluralize }} so far{% endif %}
-            {% elif wake.status == "no_answer" %}<span class="badge text-bg-warning">No answer</span>
-            {% elif wake.status == "error" or wake.status == "failed" %}<span class="badge text-bg-danger">{{ wake.get_status_display }}</span>
-            {% else %}<span class="badge text-bg-secondary">{{ wake.get_status_display }}</span>{% endif %}
-            {% if wake.message %}<div class="text-body-secondary">{{ wake.message }}</div>{% endif %}
+            {% if wake.status == "awake" %}<span class="status status-up">Awake</span> answered {{ wake.answered_after_s|duration }} after the packets were sent
+            {% elif wake.status == "waiting" %}<span class="status status-busy">Waiting for the device</span>{% if wake.checks %} {{ wake.checks }} check{{ wake.checks|pluralize }} so far{% endif %}
+            {% elif wake.status == "no_answer" %}<span class="status status-warn">No answer</span>
+            {% elif wake.status == "error" or wake.status == "failed" %}<span class="status status-down">{{ wake.get_status_display }}</span>
+            {% else %}<span class="status status-muted">{{ wake.get_status_display }}</span>{% endif %}
+            {% if wake.message %}<span class="cell-sub mt-1">{{ wake.message }}</span>{% endif %}
           </td>
         </tr>
         {% endfor %}
