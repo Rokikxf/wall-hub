@@ -57,3 +57,10 @@ All notable changes to this project are documented here. The format follows
 - The wall-wol contract copy follows the released tool. The draft written
   before the tool existed allowed one MAC address per run and had no
   `source_ip`.
+- Network map with Cytoscape.js 3.34.3 (vendored): the scanned networks as
+  boxes of devices, the hub's link to each (interface and address), each
+  network's gateway and the way to the Internet, device type and health, and
+  devices the newest scan missed. Search, details panel, fixed layout with
+  remembered drags, refresh every 30 seconds.
+- wall-scan v0.3.0, whose schema 1.1 adds `result.networks` (interface, own
+  address, gateway); the hub's contract copy and examples follow it.

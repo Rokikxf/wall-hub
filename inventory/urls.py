@@ -33,6 +33,8 @@ urlpatterns = [
     *crud("locations", "Location"),
     *crud("licences", "Licence"),
     path("expiring/", asset_views.Expiring.as_view(), name="expiring"),
+    path("map/", views.network_map, name="network-map"),
+    path("map/data/", views.network_map_data, name="network-map-data"),
     path("alerts/", views.alert_list, name="alert-list"),
     path("scans/", views.scan_list, name="scan-list"),
     path("scans/<int:pk>/", views.scan_detail, name="scan-detail"),

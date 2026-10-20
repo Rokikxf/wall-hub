@@ -45,6 +45,9 @@ MUST_FAIL = [
     ("wall-scan", "ok.json", "port out of range", {"result.devices.0.open_ports.0.port": 70000}),
     ("wall-scan", "ok.json", "timeout missing from params", {"params.timeout_s": DELETE}),
     ("wall-scan", "error.json", "error code not snake_case", {"errors.0.code": "Nmap Not Found"}),
+    ("wall-scan", "ok.json", "attached not a boolean", {"result.networks.0.attached": "yes"}),
+    ("wall-scan", "ok.json", "network without a prefix", {"result.networks.0.network": "10.0.0.0"}),
+    ("wall-scan", "ok.json", "gateway not IPv4", {"result.networks.0.gateway": "router.lan"}),
     ("wall-healthcheck", "ok.json", "up without rtt", {"result.checks.0.rtt_ms": None}),
     ("wall-healthcheck", "ok.json", "tcp check without port", {"result.checks.1.port": None}),
     ("wall-healthcheck", "ok.json", "icmp check with port", {"result.checks.0.port": 80}),
@@ -69,6 +72,12 @@ MUST_FAIL = [
 # Changes a later 1.x version may make; the v1 contract must still accept them.
 MUST_PASS = [
     ("wall-scan", "ok.json", "newer minor version", {"schema_version": "1.4"}),
+    (
+        "wall-scan",
+        "ok.json",
+        "1.0 document without networks",
+        {"schema_version": "1.0", "result.networks": DELETE},
+    ),
     ("wall-scan", "ok.json", "new field on a device", {"result.devices.0.os_guess": "Linux 5.x"}),
     ("wall-snmpinfo", "printer.json", "new field in result", {"result.manufacturer": "HP"}),
     ("wall-wol", "wake.json", "new field on a target", {"result.targets.0.secureon": False}),

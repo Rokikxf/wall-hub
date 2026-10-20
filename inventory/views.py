@@ -7,10 +7,12 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from kombu.exceptions import OperationalError
 
+from inventory import netmap
 from inventory.forms import DeviceFilterForm, MonitoringForm, ScanForm
 from inventory.models import Alert, Device, HealthRun, Scan, Wake
 from inventory.tasks import read_snmp, run_scan, wake_device
@@ -140,6 +142,17 @@ def device_wakes(request, pk):
     """The Wake-on-LAN section of a device page, which polls this view during a wake."""
     device = get_object_or_404(Device, pk=pk)
     return render(request, "inventory/_wake_section.html", wake_context(device))
+
+
+@login_required
+def network_map(request):
+    return render(request, "inventory/network_map.html")
+
+
+@login_required
+def network_map_data(request):
+    """The map's elements as JSON; the page fetches them on load and every 30 seconds."""
+    return JsonResponse({"elements": netmap.elements()})
 
 
 @login_required

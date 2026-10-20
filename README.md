@@ -4,7 +4,7 @@ The web hub of the wall IT asset management system. It runs the wall-\* command
 line tools, checks their JSON output against the contracts, stores the results
 and shows them. It uses four tools:
 - [wall-scan](https://github.com/Rokikxf/wall-scan): the hub scans the networks it is on (by schedule or with one click),
-  and keeps an inventory of the devices found;
+  keeps an inventory of the devices found, and draws them on a network map;
 - [wall-healthcheck](https://github.com/Rokikxf/wall-healthcheck): the hub
   checks the devices you choose to monitor every minute, and emails you when
   one goes down or comes back up;
@@ -103,6 +103,34 @@ ports. The very first scan is the baseline and alerts nothing; otherwise every
 device in the office would be "new". Turn this off with
 `WALL_ALERT_NEW_DEVICES=false`. Phones and laptops with randomised MAC
 addresses can show up as new when their address changes.
+
+## Network map
+
+**Map** shows the networks the hub has scanned, each as a box with the
+devices found in it. It is drawn from what the scans report: wall-scan 0.3
+and later say, for each network, which interface the hub reaches it on, the
+hub's own address there, and the network's gateway (from the routing table).
+
+- **The hub** is the star. A line to each network it sits on is labelled with
+  its interface and address, e.g. `enp0s9 10.180.103.124`. The hub's own
+  addresses are not drawn as separate devices.
+- **Routers:** each network's gateway is a diamond, with a line to the
+  Internet. A network the hub reaches through a router hangs off that router.
+  A gateway that no scan found as a device is drawn dotted.
+- **Devices** are shaped by type (computer, server, printer, network
+  equipment) and coloured by health when monitored. A device the newest scan
+  of its network did not see is faded and dashed: switched off, or gone (for
+  example a phone with a new random MAC address).
+- Click a device for its details and a link to its page. **Find** highlights
+  devices by name, IP, MAC or vendor; Enter selects the first.
+- The layout is fixed: gateway first, then by IP address, so the same network
+  always looks the same. You can drag devices; this browser remembers where,
+  until a device appears or goes. **Re-arrange** goes back to the fixed layout.
+- The page updates itself every 30 seconds.
+
+Scans by older wall-scan versions (schema 1.0) give only the networks'
+ranges, so the map has no gateways for them. The rules are in
+[inventory/netmap.py](inventory/netmap.py).
 
 ## Monitoring and alerts
 
@@ -270,9 +298,11 @@ inventory/     the app: models, scan task, contract validation, views
   alerts.py      alert emails
   snmp.py        SNMP details on devices, low-supply alerts
   wol.py         Wake-on-LAN: where the packets go, checks that the device woke
+  netmap.py      the network map's networks, devices and links
   expiry.py      warranty and licence expiry, reminder emails
   asset_views.py people, locations, licences and asset details pages
 contracts/     the hub's copies of the tool contracts
 templates/     base layout and login page
-static/vendor/ Bootstrap 5.3.8 and htmx 2.0.11, stored here so the hub works offline
+static/js/     the network map page (network_map.js)
+static/vendor/ Bootstrap 5.3.8, htmx 2.0.11 and Cytoscape.js 3.34.3, stored here so the hub works offline
 ```

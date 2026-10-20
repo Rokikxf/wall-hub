@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Network map{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-2">
+  <h1 class="h3 mb-0">Network map</h1>
+  <span id="map-status" class="small text-body-secondary" role="status"></span>
+</div>
+<p class="small text-body-secondary">Each box is a network the hub has scanned, with the devices found in it. The lines show how the hub reaches each network, and each network's router. Drag devices to arrange them; this browser remembers where you put them.</p>
+<div class="d-flex flex-wrap gap-2 mb-2">
+  <input type="search" id="map-search" class="form-control form-control-sm" style="max-width: 20rem" placeholder="Find: name, IP, MAC or vendor" aria-label="Find a device on the map">
+  <button type="button" id="map-fit" class="btn btn-sm btn-outline-secondary">Fit</button>
+  <button type="button" id="map-arrange" class="btn btn-sm btn-outline-secondary">Re-arrange</button>
+</div>
+<div class="row g-3">
+  <div class="col-lg-9">
+    <div id="map" class="border rounded bg-body" data-url="{% url 'network-map-data' %}" style="height: 70vh; min-height: 420px"></div>
+    <p id="map-empty" class="text-body-secondary mt-2" hidden>No scans yet: run one on the <a href="{% url 'scan-list' %}">Scans</a> page, and the networks it finds appear here.</p>
+  </div>
+  <div class="col-lg-3">
+    <div id="map-details" class="small" aria-live="polite">
+      <p class="text-body-secondary">Click a device, a network or the hub for its details.</p>
+    </div>
+    <h2 class="h6 mt-4">Legend</h2>
+    <ul class="list-unstyled small mb-2">
+      <li><svg width="16" height="16" aria-hidden="true"><polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6,6" fill="var(--bs-primary)"/></svg> the hub</li>
+      <li><svg width="16" height="16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> computer</li>
+      <li><svg width="16" height="16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> server</li>
+      <li><svg width="16" height="16" aria-hidden="true"><path d="M3 3 Q8 1 13 3 L13 13 Q8 15 3 13 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> printer</li>
+      <li><svg width="16" height="16" aria-hidden="true"><polygon points="8,1 15,8 8,15 1,8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> router or network equipment</li>
+      <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> phone, other or unknown</li>
+    </ul>
+    <ul class="list-unstyled small">
+      <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--bs-success)"/></svg> monitored, up</li>
+      <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--bs-danger)"/></svg> monitored, down</li>
+      <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--bs-secondary)"/></svg> monitored, not checked yet</li>
+      <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="var(--bs-secondary)" stroke-width="2"/></svg> not monitored</li>
+      <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="var(--bs-secondary)" stroke-width="2" stroke-dasharray="3 2" opacity=".5"/></svg> not seen in the newest scan of its network</li>
+    </ul>
+  </div>
+</div>
+<script src="{% static 'vendor/cytoscape.min.js' %}"></script>
+<script src="{% static 'js/network_map.js' %}"></script>
+{% endblock %}

@@ -14,6 +14,7 @@
       {% if user.is_authenticated %}
       <ul class="navbar-nav me-auto flex-wrap">
         <li class="nav-item"><a class="nav-link" href="{% url 'device-list' %}">Devices</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'network-map' %}">Map</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'person-list' %}">People</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'location-list' %}">Locations</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'licence-list' %}">Licences</a></li>
