@@ -69,6 +69,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The README is now a guide to setting up and using the hub, in plain words:
+  install step by step, first steps, each page, email, settings, backups and
+  troubleshooting. How the hub works inside moved to DEVELOPMENT.md.
 - A new look: a dark header with grouped navigation that marks the current
   page, and a red "down" count when monitored devices are down; light and
   dark themes (following the system, with a switch in the header, the map

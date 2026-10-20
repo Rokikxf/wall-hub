@@ -1,313 +1,412 @@
 # wall-hub
 
-The web hub of the wall IT asset management system. It runs the wall-\* command
-line tools, checks their JSON output against the contracts, stores the results
-and shows them. It uses four tools:
-- [wall-scan](https://github.com/Rokikxf/wall-scan): the hub scans the networks it is on (by schedule or with one click),
-  keeps an inventory of the devices found, and draws them on a network map;
-- [wall-healthcheck](https://github.com/Rokikxf/wall-healthcheck): the hub
-  checks the devices you choose to monitor every minute, and emails you when
-  one goes down or comes back up;
-- [wall-snmpinfo](https://github.com/Rokikxf/wall-snmpinfo): the hub reads the
-  model, serial number and toner levels of printers and network equipment, and
-  emails you when a supply runs low;
-- [wall-wol](https://github.com/Rokikxf/wall-wol): the hub wakes computers with
-  Wake-on-LAN, then checks that they came on.
+wall-hub keeps track of the computers, printers and other devices on your
+network, and tells you when one needs attention. It runs on one small Linux
+machine or virtual machine on that network, and you use it from a web browser.
 
-On top of what the tools find, it records who owns each device and where it
-is, warranties, and software licences, and reminds you before they expire.
+- **It finds devices by itself.** It scans your network and lists everything
+  that answers: IP and MAC address, manufacturer, name and open ports. It can
+  scan every hour, and email you when a device it has never seen joins.
+- **It watches the devices you care about.** It checks them every minute and
+  emails you when one goes down, and again when it is back.
+- **It keeps your asset records:** who has each device, where it is, its serial
+  number, purchase date and warranty, and your software licences and their
+  seats. It reminds you before warranties and licences run out.
+- **It reads printers and network equipment:** model, serial number, uptime and
+  toner levels, with an email when toner runs low.
+- **It wakes computers remotely** with Wake-on-LAN, and checks that they came on.
+- **It draws a map** of your networks, their devices and the routers between them.
 
-Only scan networks you own or have written permission to scan.
+> Only scan networks you own or have written permission to scan.
 
-## How it fits together
+## What you need
 
-```
-browser ──► web (Django) ──┐                  ┌──► wall-scan ──► nmap ──────► LAN
-                           ├─► Redis ─► worker┼──► wall-healthcheck ──────────► LAN
-            beat (timer) ──┘                  ├──► wall-snmpinfo ─────────────► LAN
-                                              └──► wall-wol ──────────────────► LAN
-                 web and worker share PostgreSQL
-```
+- **A machine that stays on**, connected to the same network as your devices:
+  a small PC, a server or a virtual machine. It is tested on Ubuntu Server
+  24.04, and needs about 2 GB of disk space, plus room for its database to grow.
+- **Docker** with its Compose plugin. Install it with
+  [Docker's guide for Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
+- **For email alerts:** an email account that can send mail through SMTP. Gmail
+  works with an [app password](https://support.google.com/accounts/answer/185833).
 
-1. **Run scan** creates a `Scan` and queues a Celery task. Beat queues a
-   health check run every `WALL_HEALTHCHECK_INTERVAL_S` seconds.
-2. The worker runs the tool, reads the JSON document from its stdout, and
-   validates it against the hub's copy of the contract in `contracts/`.
-   Anything that is not a valid document fails the run with a reason, and the
-   tool's stderr is kept for diagnosis.
-3. For a scan, each device found is matched to a known device, by MAC address
-   first, then by IP address. The rules and their limits are in
-   [inventory/ingest.py](inventory/ingest.py). For a health check, each
-   monitored device's health is updated and alerts are sent; see below.
+On a VirtualBox virtual machine, give the VM a **bridged** network adapter, so
+it sits on your network like any other computer. A VM with only NAT cannot see
+your devices.
 
-## Running on the VM
+## Install
 
-You need an Ubuntu Server VM with
-[Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/ubuntu/).
-Use bridged networking, so the VM is on the same LAN as the devices it scans.
+Run these commands on the machine that will run wall-hub. They start with
+`sudo`; leave it out if your user is in the `docker` group.
 
-```bash
-git clone https://github.com/Rokikxf/wall-hub.git
-cd wall-hub
-cp .env.example .env
-nano .env            # set the values marked CHANGE; add the VM's IP to DJANGO_ALLOWED_HOSTS
-docker compose up --build --detach
-docker compose exec web python manage.py createsuperuser
-```
-
-Then open `http://<VM IP>:8000`, log in, and go to **Scans**. To scan from the
-command line instead, and wait for the result:
-
-```bash
-docker compose exec web python manage.py scan 192.168.1.0/24 --wait
-```
-
-To update: `git pull && docker compose up --build --detach`. Migrations run
-automatically when `web` starts.
-
-### Why the worker container is different
-
-The worker runs with `network_mode: host` and the `NET_RAW` and `NET_ADMIN`
-capabilities. On Docker's default bridge network, nmap would only see Docker's
-internal network: no ARP, no MAC addresses, and no devices on the LAN. The
-capabilities are attached only to the nmap binary in the image (`setcap`), and
-the worker runs as an unprivileged user.
-
-Because the worker is on the host network, it reaches PostgreSQL and Redis on
-`127.0.0.1`. Their ports are published on the VM's loopback interface only,
-not on the LAN.
-
-## Automatic scans and new-device alerts
-
-You don't need to type addresses. **Scan local networks** on the Scans page
-(or `manage.py scan --local --wait`) runs `wall-scan --local`. That finds every
-private network the VM is directly attached to, and skips Docker's and VPN
-networks. Each scan's page lists the networks it actually scanned.
-
-To scan on a schedule, set in `.env`:
-
-| Setting                         | Effect                                                      |
-|---------------------------------|-------------------------------------------------------------|
-| `WALL_AUTO_SCAN_INTERVAL_MIN=60` | A quick discovery sweep (no ports) every 60 minutes: finds new devices fast. |
-| `WALL_AUTO_PORT_SCAN_HOUR=2`    | A full scan, with ports, every day at 02:30.                |
-| `WALL_SCAN_EXCLUDE_INTERFACES=enp0s3` | Never scan these interfaces' networks (here VirtualBox's NAT). |
-
-Both are off by default, because they scan whatever network the VM is plugged
-into: switch them on only where you are allowed to scan. An automatic scan does
-nothing while another scan is still running.
-
-Hourly sweeps add up, so scans older than `WALL_SCAN_RETENTION_DAYS` (90) are
-deleted after each scan. The one a device was last seen in is kept, because
-its page links to it. `0` keeps every scan.
-
-**New devices:** when a scan sees a device for the first time, the hub creates
-a *New device* alert and emails `WALL_ALERT_EMAILS`. It sends one email per
-scan, listing every new device with its MAC address, vendor, hostname and open
-ports. The very first scan is the baseline and alerts nothing; otherwise every
-device in the office would be "new". Turn this off with
-`WALL_ALERT_NEW_DEVICES=false`. Phones and laptops with randomised MAC
-addresses can show up as new when their address changes.
-
-## Network map
-
-**Map** shows the networks the hub has scanned, each as a box with the
-devices found in it. It is drawn from what the scans report: wall-scan 0.3
-and later say, for each network, which interface the hub reaches it on, the
-hub's own address there, and the network's gateway (from the routing table).
-
-- **The hub** is the star. A line to each network it sits on is labelled with
-  its interface and address, e.g. `enp0s9 10.180.103.124`. The hub's own
-  addresses are not drawn as separate devices.
-- **Routers:** each network's gateway is a diamond, with a line to the
-  Internet. A network the hub reaches through a router hangs off that router.
-  A gateway that no scan found as a device is drawn dotted.
-- **Devices** are shaped by type (computer, server, printer, network
-  equipment) and coloured by health when monitored. A device the newest scan
-  of its network did not see is faded and dashed: switched off, or gone (for
-  example a phone with a new random MAC address).
-- Click a device for its details and a link to its page. **Find** highlights
-  devices by name, IP, MAC or vendor; Enter selects the first.
-- The layout is fixed: gateway first, then by IP address, so the same network
-  always looks the same. You can drag devices; this browser remembers where,
-  until a device appears or goes. **Re-arrange** goes back to the fixed layout.
-- The page updates itself every 30 seconds.
-
-Scans by older wall-scan versions (schema 1.0) give only the networks'
-ranges, so the map has no gateways for them. The rules are in
-[inventory/netmap.py](inventory/netmap.py).
-
-## Monitoring and alerts
-
-Open a device and tick **Monitor this device**. By default it is pinged. For a
-device that drops ping, such as a Windows PC, enter a TCP port that is open on
-it instead, e.g. 445 or 3389.
-
-- Beat starts a run every `WALL_HEALTHCHECK_INTERVAL_S` seconds (60 by default).
-  The worker checks all monitored devices in one `wall-healthcheck` call.
-- A device counts as **down** after `WALL_ALERT_AFTER_FAILURES` failed checks in
-  a row (2 by default). That avoids alarms for a single lost ping. One
-  successful check brings it back **up**.
-- Each change creates one alert: one DOWN email when the device goes down, and
-  one BACK UP email, with the outage length, when it returns. Alerts are listed
-  on the **Alerts** page and on each device's page. The rules are in
-  [inventory/monitoring.py](inventory/monitoring.py).
-- Runs never overlap: if a run is still going when the next is due, the next one
-  is skipped. A run that fails (for example, ping not permitted) leaves every
-  device's health unchanged, and the device list shows the reason.
-
-To send email, set the `EMAIL_*` values and `WALL_ALERT_EMAILS` in `.env`.
-Without `EMAIL_HOST`, emails are printed to the worker's log
-(`docker compose logs worker`). To check the mail settings, and to run a health
-check now and wait for the result:
-
-```bash
-docker compose exec web python manage.py sendtestemail you@example.com
-docker compose exec web python manage.py healthcheck --wait
-```
-
-Ping uses Linux ping sockets and needs no capabilities. The host must allow
-them through `net.ipv4.ping_group_range`, because the worker shares the host's
-network. Ubuntu Server 24.04 has them **disabled** (`1 0`); without them every
-health check run fails with `icmp_not_permitted`. Allow them once on the VM:
+**1. Allow ping.** wall-hub checks devices with ping, and Ubuntu Server only lets
+ordinary programs ping once you allow it:
 
 ```bash
 echo 'net.ipv4.ping_group_range = 0 2147483647' | sudo tee /etc/sysctl.d/60-ping.conf
 sudo sysctl -p /etc/sysctl.d/60-ping.conf
 ```
 
-## Assets: owners, locations, warranties and licences
-
-Scans find devices; people add the business details. These are never changed
-by a scan.
-
-- **People** and **Locations** have their own pages. Set a device's owner,
-  location, type, asset tag, make and model, serial number, purchase date and
-  warranty end date with **Edit asset details** on its page.
-- **Licences** have a key, a number of seats (empty means unlimited) and an
-  optional expiry date. Assign each one to people (for per-user licences such
-  as Microsoft 365) and to devices (for per-device licences). Each assignment
-  uses a seat. Over-allocation is shown, not blocked, so the list matches
-  reality. Keys are hidden until you click **Show** on the licence page.
-- **Devices** can be searched and filtered: by IP address, name, hostname,
-  MAC address, serial number, asset tag or owner, and by type, owner or location.
-- **Expiring** lists warranties and licences that end in the next 90 days or
-  ended in the last 90. Every morning (`WALL_EXPIRY_REMINDER_HOUR`), beat emails
-  a digest of whatever ends in exactly 30, 7 or 1 days, or today
-  (`WALL_EXPIRY_REMINDER_DAYS`), to `WALL_ALERT_EMAILS`. The rule depends only
-  on the date, so nothing is stored and nothing is sent twice. The logic is in
-  [inventory/expiry.py](inventory/expiry.py).
-
-## SNMP: model, serial number and toner levels
-
-Every `WALL_SNMP_INTERVAL_H` hours (6 by default), the worker reads devices
-with `wall-snmpinfo`. A device's page then shows its model, serial number,
-name, location, uptime and, for printers, a level bar per supply. **Read now**
-on that page reads it at once.
-
-- **Which devices:** set on each device page. *Automatic* (the default) means
-  printers and network equipment, plus devices with a printing port open (9100,
-  631 or 515), which are printers not yet given a type. *On* or *Off* overrides
-  that.
-- **The community string** is `WALL_SNMP_COMMUNITY` in `.env` (often `public`).
-  The tool reads it from its environment, so it never appears on a command
-  line, in the output or in the database.
-- **Asset fields:** the model and serial number read over SNMP fill those
-  fields when they are empty. Values you entered are never overwritten.
-- **Low supplies:** when a supply drops below `WALL_TONER_ALERT_PERCENT` (10%),
-  you get one *Supply low* alert and email per device, listing every supply
-  that just ran low. A supply is reported again only after a reading at or
-  above the threshold, such as after a refill. A waste container with little
-  space left counts as *nearly full*. Supplies that report no number ("some
-  left") are never counted as low or refilled. The rules are in
-  [inventory/snmp.py](inventory/snmp.py).
-- A failed read keeps the last successful result on the page, with the reason
-  it failed.
-
-## Wake-on-LAN
-
-**Wake** on a device's page sends Wake-on-LAN magic packets to its MAC
-address. The button is greyed out for devices whose MAC address no scan has
-found: scans see MAC addresses only on the hub's own networks.
-
-- **Where the packets go:** to the broadcast address of the network a scan
-  found the device on, for example `10.180.103.255` for `10.180.103.0/24`.
-  This matters on a VM with several network adapters: `255.255.255.255` leaves
-  through the adapter with the default route, which on the lab VM is
-  VirtualBox's NAT adapter, so the LAN would never see the packets. When no
-  scan covered a network the device is in, the hub uses `WALL_WOL_BROADCAST`,
-  and says so on the page, with the address the packets left from.
-- **Did it wake up?** Wake-on-LAN has no reply. So after sending, the worker
-  checks the device every 15 seconds for up to `WALL_WOL_WAIT_S` (3 minutes),
-  the same way monitoring does: ping, or the TCP port set under **Monitoring**.
-  The page updates itself and shows *Awake, answered 45 seconds after the
-  packets were sent* or *No answer*. Windows blocks ping by default, so for a
-  Windows PC set a TCP port such as 445 first. Each check is its own short
-  task, so a booting PC does not hold up a worker.
-- Every wake is kept: who sent it, when, where the packets went and the result.
-  The last five are on the device's page.
-
-The device itself must be set up for Wake-on-LAN: in its firmware, its network
-card driver and, on Windows, with Fast Startup off. The
-[wall-wol README](https://github.com/Rokikxf/wall-wol#preparing-a-device)
-explains how. The hub must be on the same network (LAN or VLAN) as the device,
-because routers do not forward broadcasts.
-
-## Security notes
-
-- The hub serves plain HTTP. That is fine on a trusted LAN, but HTTPS through
-  a reverse proxy is still to come. Until then, `manage.py check --deploy`
-  reports four HTTPS-related warnings.
-- Scans are limited to private address ranges of at most a /16. The scan
-  form checks this, and wall-scan enforces it again.
-- Every page requires a login. Create users with `createsuperuser` or in the
-  admin site at `/admin/`.
-
-## Contracts
-
-`contracts/<tool>/v<major>.json` are the hub's copies of the tools' output
-schemas. See [contracts/README.md](contracts/README.md). The rules all tools
-follow are in `CONTRACT.md` in the tool template repository.
-
-## Development
-
-Works on Windows or Linux, without Docker:
+**2. Download wall-hub** and make your settings file:
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate            # Linux: . .venv/bin/activate
-pip install -r requirements-dev.txt
-pytest                            # SQLite; no Redis, nmap or network needed
-ruff check . && ruff format --check .
+git clone https://github.com/Rokikxf/wall-hub.git
+cd wall-hub
+cp .env.example .env
 ```
 
-The tests replace wall-scan with the example documents from `contracts/`, so
-the hub is tested against exactly what the contract promises.
+**3. Fill in the settings.** Open the file with `nano .env` and set these four:
 
-CI runs the tests on PostgreSQL. It then builds the Docker image, starts the
-whole stack, and runs a real scan of 127.0.0.1 through web, Redis, the worker,
-wall-scan and nmap. It then monitors the device that scan found, and runs a real
-health check of it through wall-healthcheck, and an SNMP read through
-wall-snmpinfo (there is no SNMP agent on the runner, so it must end as a clean
-`snmp_timeout`). Last, it wakes the device: wall-wol sends the magic packets to a
-UDP socket the test opens on 127.0.0.1, which checks them byte for byte, and the
-follow-up check through Redis and the worker must find the device awake.
+| Setting                | What to put                                                        |
+|------------------------|--------------------------------------------------------------------|
+| `DJANGO_SECRET_KEY`    | A long random string (see below). It protects logins.              |
+| `POSTGRES_PASSWORD`    | Another random string: the database's password. You never type it again. |
+| `DJANGO_ALLOWED_HOSTS` | Add the machine's IP address: `localhost,127.0.0.1,192.168.1.10`. |
+| `TIME_ZONE`            | Your time zone, for example `Europe/Dublin` or `America/New_York`. |
+
+To make a random string, run `openssl rand -hex 32`, once for each. To find
+the machine's IP address, run `hostname -I`. The other settings can wait; they
+are explained under [Settings](#settings).
+
+**4. Start wall-hub:**
+
+```bash
+sudo docker compose up --build --detach
+```
+
+The first start downloads and builds everything, which takes a few minutes.
+After that, wall-hub starts by itself whenever the machine starts.
+
+**5. Create your login.** It asks for a username, an email address (you can
+leave it empty) and a password:
+
+```bash
+sudo docker compose exec web python manage.py createsuperuser
+```
+
+**6. Open it.** On any computer on the network, open a browser at
+`http://<the machine's IP address>:8000`, for example `http://192.168.1.10:8000`,
+and log in.
+
+## First steps
+
+1. **Scan your network.** Go to **Scans** and click **Scan local networks**.
+   wall-hub works out by itself which networks it is connected to. The scan takes
+   a few minutes; its row updates by itself, and the devices it finds appear on
+   **Devices**. This first scan is the starting point: from now on, wall-hub tells
+   you about devices it has not seen before.
+2. **Add people and places.** Add the people who use your devices under
+   **People**, and rooms or sites under **Locations**.
+3. **Describe your devices.** Open a device and click **Edit asset details**:
+   give it a name such as "Reception printer", a type, an owner, a location and
+   whatever else you know, such as the serial number or the warranty end date.
+4. **Monitor the devices that matter.** On a device's page, tick **Monitor this
+   device** and click **Save**. Windows PCs do not answer ping by default: for
+   them, also enter a port that is open on them under **Check TCP port**, such
+   as `445`, or `3389` if Remote Desktop is on.
+5. **Get emails.** Set up [email alerts](#email-alerts).
+6. **Scan automatically.** Set `WALL_AUTO_SCAN_INTERVAL_MIN=60` to look for new
+   devices every hour (see [Automatic scans](#automatic-scans)).
+
+## Using wall-hub
+
+### Devices
+
+The home page. The tiles at the top show how many devices there are, how many
+monitored devices are down, the alerts of the last 24 hours and when the last
+scan ran. Search by IP address, name, MAC address, serial number, asset tag or
+owner, and filter by type, owner or location. The page updates itself every 30
+seconds. When a monitored device is down, a red **1 down** shows in the header
+of every page.
+
+| Status            | Meaning                                                            |
+|-------------------|--------------------------------------------------------------------|
+| **Up · 1.4 ms**   | Answered the last check, in 1.4 milliseconds.                      |
+| **1 failed check** | Missed the last check. One more miss and it counts as down.       |
+| **Down since 20:22** | Missed two checks in a row. You got an email.                   |
+| **Not checked yet** | Monitored, waiting for its first check.                          |
+| not monitored     | wall-hub does not check this device.                               |
+
+### A device's page
+
+The top shows the device's status, type, owner, location and when it was last
+seen. Below:
+
+- **Network:** what the scans found: IP and MAC address, manufacturer, hostname
+  and open ports. Scans keep this up to date.
+- **Asset:** your records. Change them with **Edit asset details**; scans never
+  overwrite them.
+- **Monitoring:** whether wall-hub checks the device, and how: ping, or a TCP
+  port for devices that block ping.
+- **Wake-on-LAN:** wake the device with **Wake** (see
+  [Waking computers](#waking-computers)).
+- **Licences** assigned to the device, **SNMP** details for printers and
+  network equipment, and the device's **Alerts**.
+
+### Map
+
+**Map** draws each network wall-hub has scanned as a box of its devices. The
+star is wall-hub itself, and the lines show how it is connected to each network.
+Each network's router is a diamond, with a line to the Internet.
+
+Shapes show the device type and colours their health: green is up, red is down,
+grey is not checked yet, and an empty outline is not monitored. A faded, dashed
+device was not seen in the last scan: it is switched off, or gone. Click a
+device for its details, or use **Find** to search. You can drag devices around;
+your browser remembers where, and **Re-arrange** puts them back in order.
+
+### Alerts
+
+| Alert          | When                                                         |
+|----------------|--------------------------------------------------------------|
+| **Down**       | A monitored device misses two checks in a row.               |
+| **Back up**    | It answers again; the email says how long it was down.       |
+| **New device** | A scan sees a device for the first time. One email per scan lists them all. |
+| **Supply low** | A printer's toner or other supply drops below 10%.           |
+
+Each alert is emailed to the addresses in `WALL_ALERT_EMAILS`, and listed under
+**Alerts** and on the device's page. If an email could not be sent, the
+**Email** column says **failed**; point at it to see why.
+
+### People, locations and licences
+
+**People** and **Locations** list who has which device and where devices are;
+each person's and place's page lists their devices. Under **Licences**, add your
+software licences with their key, number of seats and expiry date, and assign
+each to the people (for per-user licences such as Microsoft 365) or devices
+(for per-computer licences) that use it. Each assignment takes a seat. When more
+are assigned than you have seats, the licence is marked in red. Keys stay hidden
+until you click **Show**.
+
+### Expiring warranties and licences
+
+**Expiring** lists the warranties and licences that end in the next 90 days,
+and those that ended in the last 90. Once email is set up, wall-hub also sends
+a reminder at 8:00, 30 days, 7 days and 1 day before each end date, and on the
+day itself.
+
+### Printers and network equipment (SNMP)
+
+wall-hub reads printers and network equipment that have SNMP switched on, every
+6 hours: the model, serial number, name, location and uptime, and, for
+printers, each supply's level as a bar. Click **Read now** on a device's page to
+read it straight away. An empty model or serial number in your asset details is
+filled in from SNMP; anything you entered is left alone.
+
+It reads devices whose type is Printer or Network equipment automatically, and
+devices with a printing port open (printers that have no type yet). For any
+other device, choose **On** under **Read with SNMP**. SNMP must be switched on in the device's
+settings, usually with the community name `public`; if yours uses another, set
+`WALL_SNMP_COMMUNITY`.
+
+### Waking computers
+
+**Wake** on a device's page switches a computer on over the network, with
+Wake-on-LAN. wall-hub then checks for up to 3 minutes whether it answers, and
+shows **Awake** or **No answer**. To work:
+
+- The computer must have Wake-on-LAN switched on: in its BIOS or UEFI settings,
+  in its network card's settings and, on Windows, with Fast Startup off.
+  [How to switch it on](https://github.com/Rokikxf/wall-wol#preparing-a-device).
+- It must be connected by cable, on the same network as wall-hub.
+- A scan must have found its MAC address. Otherwise the button is greyed out.
+- Windows PCs block ping, so set **Check TCP port** to `445` first, or wall-hub
+  cannot tell that the PC woke up.
+
+### Light and dark
+
+wall-hub follows your computer's light or dark setting. The half-circle button
+in the header switches between them; your browser remembers the choice.
+
+## Email alerts
+
+Put your mail server's details in `.env`. For Gmail, with an
+[app password](https://support.google.com/accounts/answer/185833):
 
 ```
-wallhub/       Django project: settings, URLs, Celery app
-inventory/     the app: models, scan task, contract validation, views
-  contracts.py   validates tool output against contracts/
-  runner.py      runs a wall-* tool and returns a valid document
-  ingest.py      stores a scan and matches devices
-  monitoring.py  health checks to device health and alerts
-  alerts.py      alert emails
-  snmp.py        SNMP details on devices, low-supply alerts
-  wol.py         Wake-on-LAN: where the packets go, checks that the device woke
-  netmap.py      the network map's networks, devices and links
-  expiry.py      warranty and licence expiry, reminder emails
-  asset_views.py people, locations, licences and asset details pages
-contracts/     the hub's copies of the tool contracts
-templates/     base layout and login page
-static/css/    the hub's own styles on top of Bootstrap (hub.css), for light and dark
-static/js/     the network map page (network_map.js)
-static/vendor/ Bootstrap 5.3.8, htmx 2.0.11 and Cytoscape.js 3.34.3, stored here so the hub works offline
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=you@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+EMAIL_USE_TLS=true
+DEFAULT_FROM_EMAIL=you@gmail.com
+WALL_ALERT_EMAILS=it@example.com
+WALL_HUB_URL=http://192.168.1.10:8000
 ```
+
+`WALL_ALERT_EMAILS` is who gets the alerts (several addresses separated by
+commas), and `WALL_HUB_URL` puts a link to the device in each email. Apply the
+settings, then send yourself a test email:
+
+```bash
+sudo docker compose up --detach --force-recreate
+sudo docker compose exec web python manage.py sendtestemail you@example.com
+```
+
+## Automatic scans
+
+Automatic scans are off until you switch them on, because they scan whatever
+network the machine is plugged into. In `.env`:
+
+```
+WALL_AUTO_SCAN_INTERVAL_MIN=60
+WALL_AUTO_PORT_SCAN_HOUR=2
+```
+
+The first line looks for devices every 60 minutes, which is quick and finds new
+devices soon after they connect. The second also scans every device's open ports
+each night at 2:30. On a VirtualBox VM, add `WALL_SCAN_EXCLUDE_INTERFACES=enp0s3`
+so wall-hub does not scan VirtualBox's own NAT network.
+
+## Settings
+
+All settings live in `.env`. After changing one, apply it with
+`sudo docker compose up --detach --force-recreate`.
+
+**Basics**
+
+| Setting                | Default            | Meaning                                         |
+|------------------------|--------------------|-------------------------------------------------|
+| `DJANGO_SECRET_KEY`    | (must be set)      | A long random string that protects logins.     |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | The addresses you open wall-hub at.          |
+| `TIME_ZONE`            | `Europe/Dublin`    | For the times shown and the email schedule.     |
+| `POSTGRES_PASSWORD`    | (must be set)      | The database password.                          |
+| `WALL_HUB_PORT`        | `8000`             | The port wall-hub is opened at.                 |
+
+**Email:** `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
+`EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL`, `WALL_ALERT_EMAILS` and `WALL_HUB_URL`,
+as in [Email alerts](#email-alerts). Without `EMAIL_HOST`, emails are only
+written to the log; alerts are still listed under **Alerts**.
+
+**Scans**
+
+| Setting                        | Default | Meaning                                         |
+|--------------------------------|---------|-------------------------------------------------|
+| `WALL_AUTO_SCAN_INTERVAL_MIN`  | `0`     | Look for devices every N minutes (`0`: never).  |
+| `WALL_AUTO_PORT_SCAN_HOUR`     | empty   | Also scan ports every night at this hour, at :30 (empty: never). |
+| `WALL_SCAN_EXCLUDE_INTERFACES` | empty   | Network adapters whose networks are never scanned, e.g. `enp0s3`. |
+| `WALL_ALERT_NEW_DEVICES`       | `true`  | Email when a scan finds a new device.           |
+| `WALL_SCAN_RETENTION_DAYS`     | `90`    | Delete scans older than this (`0`: keep all).    |
+| `WALL_SCAN_TIMEOUT_S`          | `600`   | Stop a scan that takes longer than this.         |
+| `WALL_DEFAULT_TARGETS`         | empty   | Addresses already filled in under **Scan specific addresses**. |
+
+**Monitoring**
+
+| Setting                       | Default | Meaning                                          |
+|-------------------------------|---------|--------------------------------------------------|
+| `WALL_HEALTHCHECK_INTERVAL_S` | `60`    | Check monitored devices every N seconds.         |
+| `WALL_ALERT_AFTER_FAILURES`   | `2`     | Missed checks in a row before a device is down.  |
+
+**Printers and network equipment (SNMP)**
+
+| Setting                    | Default  | Meaning                                       |
+|----------------------------|----------|-----------------------------------------------|
+| `WALL_SNMP_COMMUNITY`      | `public` | The SNMP community name of your devices.      |
+| `WALL_SNMP_INTERVAL_H`     | `6`      | Read them every N hours (`0`: only with **Read now**). |
+| `WALL_TONER_ALERT_PERCENT` | `10`     | Email when a supply drops below this.         |
+
+**Wake-on-LAN**
+
+| Setting              | Default           | Meaning                                          |
+|----------------------|-------------------|--------------------------------------------------|
+| `WALL_WOL_WAIT_S`    | `180`             | How long to check whether a woken device answers (`0`: don't check). |
+| `WALL_WOL_BROADCAST` | `255.255.255.255` | Where to send the packets for a device whose network no scan has covered. |
+
+**Reminders**
+
+| Setting                     | Default      | Meaning                                    |
+|-----------------------------|--------------|--------------------------------------------|
+| `WALL_EXPIRY_REMINDER_DAYS` | `30,7,1,0`   | Days before an end date to send a reminder (`0`: on the day). |
+| `WALL_EXPIRY_REMINDER_HOUR` | `8`          | The hour the reminders are sent.           |
+
+## Everyday tasks
+
+**Update to the newest version.** Your data is kept:
+
+```bash
+cd wall-hub
+git pull
+sudo docker compose up --build --detach
+```
+
+**Back up.** Everything wall-hub knows is in its database. This saves it to a
+file; keep it, together with a copy of `.env`, somewhere other than this machine:
+
+```bash
+sudo docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > wall-backup.sql
+```
+
+To restore it on a new machine: do the [Install](#install) steps 1 and 2, put
+your old `.env` back in place of the new one, and replace step 4 with:
+
+```bash
+sudo docker compose up --detach db
+sudo docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < wall-backup.sql
+sudo docker compose up --build --detach
+```
+
+You can then log in with your old users; skip step 5.
+
+**Add another user.** Run `createsuperuser` again (step 5 of
+[Install](#install)), or use **Admin** in the header, then **Users**. In
+wall-hub's pages, every user can see and change everything.
+
+**Stop and start wall-hub:** `sudo docker compose stop` and
+`sudo docker compose start`, in the `wall-hub` folder.
+
+**See what it is doing:** `sudo docker compose logs --tail 50 worker` shows the
+latest scans, checks and emails.
+
+## Troubleshooting
+
+**The browser says "Bad Request (400)".** The address you opened is not in
+`DJANGO_ALLOWED_HOSTS`. Add it, then apply the settings.
+
+**The page does not open at all.** Check that wall-hub is running: in the
+`wall-hub` folder, `sudo docker compose ps` should list five services as
+running. Check also that you used port 8000, and that no firewall blocks it.
+
+**Monitored devices stay "Not checked yet", and the devices page says "This
+user may not open ICMP sockets".** Ping is not allowed yet: do step 1 of
+[Install](#install).
+
+**Devices have no MAC address or manufacturer.** The machine is not on the
+same network as them. On a virtual machine, use a bridged adapter. Devices
+behind a router never show a MAC address.
+
+**A Windows PC shows as down, but it is on.** Windows does not answer ping. Set
+**Check TCP port** to `445` on its page.
+
+**Emails do not arrive.** Send a test email (see [Email alerts](#email-alerts)):
+it shows the mail server's error, if any. For Gmail, use an app password, not
+your normal password. Also check the **Email** column under **Alerts**.
+
+**Wake does nothing.** See the list under [Waking computers](#waking-computers).
+The **Sent to** column shows where the packets went: it should end in `.255` on
+the computer's own network.
+
+**A phone shows up as a new device again and again.** Phones change their MAC
+address on each network, and sometimes over time, so wall-hub cannot tell it is
+the same phone.
+
+**A printer shows no SNMP details.** Switch SNMP on in the printer's settings,
+check the community name (`WALL_SNMP_COMMUNITY`), and click **Read now**: the
+page then says why the read failed.
+
+## Security
+
+- wall-hub serves plain HTTP. Use it on a network you trust, and do not make it
+  reachable from the internet.
+- Every page needs a login. Give each person their own, with a strong password.
+- `.env` holds your passwords: keep it private, and keep a copy with your
+  backups.
+- The database is only reachable from the machine itself, not from the network.
+
+## For developers
+
+How wall-hub works inside, the contracts it checks the tools' output against,
+the tests and the code layout are in [DEVELOPMENT.md](DEVELOPMENT.md). The work
+on the network is done by four command-line tools:
+[wall-scan](https://github.com/Rokikxf/wall-scan),
+[wall-healthcheck](https://github.com/Rokikxf/wall-healthcheck),
+[wall-snmpinfo](https://github.com/Rokikxf/wall-snmpinfo) and
+[wall-wol](https://github.com/Rokikxf/wall-wol).
