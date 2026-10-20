@@ -64,3 +64,17 @@ All notable changes to this project are documented here. The format follows
   remembered drags, refresh every 30 seconds.
 - wall-scan v0.3.0, whose schema 1.1 adds `result.networks` (interface, own
   address, gateway); the hub's contract copy and examples follow it.
+- Scan history is pruned: scans older than `WALL_SCAN_RETENTION_DAYS` (90) are
+  deleted after each scan, except a device's last scan.
+
+### Changed
+
+- The Scans page no longer loads each scan's full output, only the networks
+  it scanned.
+- `Device.ip` is indexed, since every scan looks devices up by IP address.
+- The person, location and licence pages load the listed devices' owners and
+  locations in one query, instead of up to two more queries per device.
+- `manage.py scan --wait` returns as soon as the scan has finished, instead
+  of always waiting at least a second.
+- wall-snmpinfo v0.1.1: an SNMP error in a table is reported as an error, not a
+  timeout.

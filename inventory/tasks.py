@@ -33,6 +33,22 @@ def scan_command(scan: Scan) -> list[str]:
     return command
 
 
+def prune_scans(now) -> int:
+    """Delete finished scans older than WALL_SCAN_RETENTION_DAYS. Returns how many.
+
+    A scan that is still some device's last scan is kept: the device page links
+    to it, and Wake-on-LAN looks up the device's network in it.
+    """
+    days = settings.WALL_SCAN_RETENTION_DAYS
+    if days <= 0:
+        return 0
+    # exclude(last_scan=None): NOT IN with a NULL in the list would match nothing.
+    in_use = Device.objects.exclude(last_scan=None).values("last_scan")
+    old = Scan.objects.filter(status__in=Scan.FINISHED, created_at__lt=now - timedelta(days=days))
+    deleted, _ = old.exclude(pk__in=in_use).delete()
+    return deleted
+
+
 @shared_task
 def run_scan(scan_id: int) -> str:
     """Run wall-scan for a queued Scan and store the outcome. Returns the final status."""
@@ -51,12 +67,12 @@ def run_scan(scan_id: int) -> str:
         scan.stderr = exc.stderr
         scan.finished_at = timezone.now()
         scan.save()
-        return scan.status
-
-    scan.stderr = stderr
-    new_devices = apply_scan(scan, document)
-    # Emails go out after the database work, so a slow mail server holds no locks.
-    alerts.send_new_devices(new_devices)
+    else:
+        scan.stderr = stderr
+        new_devices = apply_scan(scan, document)
+        # Emails go out after the database work, so a slow mail server holds no locks.
+        alerts.send_new_devices(new_devices)
+    prune_scans(timezone.now())
     return scan.status
 
 

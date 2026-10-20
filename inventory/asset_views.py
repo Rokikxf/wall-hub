@@ -46,6 +46,15 @@ class FormPage(LoginRequiredMixin, SuccessMessageMixin):
         return f"Edit {self.object}"
 
 
+class WithDevices:
+    """A detail page that lists the object's devices (inventory/_device_table.html).
+    Their owners and locations come in the same query, not one query per row."""
+
+    def get_context_data(self, **kwargs):
+        devices = self.object.devices.select_related("owner", "location")
+        return super().get_context_data(devices=devices, **kwargs)
+
+
 class DeletePage(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
     template_name = "inventory/confirm_delete.html"
 
@@ -74,7 +83,7 @@ class PersonList(LoginRequiredMixin, ListView):
     )
 
 
-class PersonDetail(LoginRequiredMixin, DetailView):
+class PersonDetail(LoginRequiredMixin, WithDevices, DetailView):
     model = Person
 
 
@@ -102,7 +111,7 @@ class LocationList(LoginRequiredMixin, ListView):
     queryset = Location.objects.annotate(device_count=Count("devices"))
 
 
-class LocationDetail(LoginRequiredMixin, DetailView):
+class LocationDetail(LoginRequiredMixin, WithDevices, DetailView):
     model = Location
 
 
@@ -132,7 +141,7 @@ class LicenceList(LoginRequiredMixin, ListView):
     )
 
 
-class LicenceDetail(LoginRequiredMixin, DetailView):
+class LicenceDetail(LoginRequiredMixin, WithDevices, DetailView):
     model = Licence
 
 

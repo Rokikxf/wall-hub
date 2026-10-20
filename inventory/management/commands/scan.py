@@ -46,6 +46,7 @@ class Command(BaseCommand):
             return
 
         deadline = time.monotonic() + options["wait_timeout"]
+        scan.refresh_from_db()  # a worker may have finished it already
         while not scan.is_finished:
             if time.monotonic() > deadline:
                 raise CommandError(f"Scan {scan.pk} still {scan.status} after the wait timeout")

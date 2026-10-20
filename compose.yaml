@@ -1,11 +1,13 @@
 # wall-hub on a single Docker host (the Ubuntu VM).
 #
 #   web     Django + gunicorn on port 8000. Applies migrations on start.
-#   worker  Celery worker that runs wall-scan and wall-healthcheck. It uses the
-#           host's network so nmap is on the same network segment as the
-#           devices (ARP, MAC addresses), with the capabilities nmap needs for
-#           raw packets. Ping uses ping sockets: no capabilities needed.
-#   beat    Celery beat: starts a health check run every minute.
+#   worker  Celery worker that runs the wall-* tools: wall-scan, wall-healthcheck,
+#           wall-snmpinfo and wall-wol. It uses the host's network so nmap is on
+#           the same network segment as the devices (ARP, MAC addresses) and
+#           Wake-on-LAN broadcasts reach them, with the capabilities nmap needs
+#           for raw packets. Ping uses ping sockets: no capabilities needed.
+#   beat    Celery beat: health checks every minute, and the automatic scans,
+#           SNMP reads and expiry reminders when they are switched on.
 #   db      PostgreSQL.  redis  Redis, the Celery broker.
 #
 # db and redis publish their ports on 127.0.0.1 only: the host-network worker

@@ -39,6 +39,15 @@ class Person(models.Model):
         return reverse("person-detail", args=[self.pk])
 
 
+class ScanQuerySet(models.QuerySet):
+    def for_list(self):
+        """Scans for the scan table: without output and stderr, which can be large.
+        scanned_networks then comes from the database's copy of params.targets."""
+        return self.defer("output", "stderr").annotate(
+            listed_networks=models.F("output__params__targets")
+        )
+
+
 class Scan(models.Model):
     """One run of wall-scan, from the request to the stored result."""
 
@@ -78,6 +87,8 @@ class Scan(models.Model):
     stderr = models.TextField(blank=True)
     device_count = models.PositiveIntegerField(null=True, blank=True)
 
+    objects = ScanQuerySet.as_manager()
+
     class Meta:
         ordering = ["-created_at"]
 
@@ -98,6 +109,8 @@ class Scan(models.Model):
     @property
     def scanned_networks(self) -> list[str]:
         """What wall-scan actually scanned, including the networks --local found."""
+        if "output" in self.get_deferred_fields():  # loaded with for_list()
+            return getattr(self, "listed_networks", None) or []
         return (self.output or {}).get("params", {}).get("targets", [])
 
 
@@ -122,7 +135,8 @@ class Device(models.Model):
         PHONE = "phone", "Phone or tablet"
         OTHER = "other", "Other"
 
-    ip = models.GenericIPAddressField(protocol="IPv4")
+    # Indexed: every scan looks each device up by IP address (inventory/ingest.py).
+    ip = models.GenericIPAddressField(protocol="IPv4", db_index=True)
     mac = models.CharField(max_length=17, unique=True, null=True, blank=True)
     vendor = models.CharField(max_length=200, blank=True)
     hostname = models.CharField(max_length=255, blank=True)

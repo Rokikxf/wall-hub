@@ -16,7 +16,7 @@
   {% if person.notes %}<dt class="col-sm-3">Notes</dt><dd class="col-sm-9">{{ person.notes|linebreaksbr }}</dd>{% endif %}
 </dl>
 <h2 class="h5">Devices</h2>
-{% include "inventory/_device_table.html" with devices=person.devices.all %}
+{% include "inventory/_device_table.html" %}
 <h2 class="h5">Licences</h2>
 {% with licences=person.licences.all %}
 {% if licences %}

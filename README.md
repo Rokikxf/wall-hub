@@ -96,6 +96,10 @@ Both are off by default, because they scan whatever network the VM is plugged
 into: switch them on only where you are allowed to scan. An automatic scan does
 nothing while another scan is still running.
 
+Hourly sweeps add up, so scans older than `WALL_SCAN_RETENTION_DAYS` (90) are
+deleted after each scan. The one a device was last seen in is kept, because
+its page links to it. `0` keeps every scan.
+
 **New devices:** when a scan sees a device for the first time, the hub creates
 a *New device* alert and emails `WALL_ALERT_EMAILS`. It sends one email per
 scan, listing every new device with its MAC address, vendor, hostname and open

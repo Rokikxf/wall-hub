@@ -198,7 +198,7 @@ def scan_list(request):
             return start_scan(request, scan)
     context = {
         "form": form,
-        "scans": Scan.objects.select_related("requested_by")[:50],
+        "scans": Scan.objects.for_list().select_related("requested_by")[:50],
         "auto_interval": settings.WALL_AUTO_SCAN_INTERVAL_MIN,
         "auto_port_hour": settings.WALL_AUTO_PORT_SCAN_HOUR,
     }
@@ -208,7 +208,7 @@ def scan_list(request):
 @login_required
 def scan_row(request, pk):
     """One row of the scan table. Unfinished rows poll this view with HTMX."""
-    scan = get_object_or_404(Scan, pk=pk)
+    scan = get_object_or_404(Scan.objects.for_list(), pk=pk)
     return render(request, "inventory/_scan_row.html", {"scan": scan})
 
 

@@ -1,6 +1,8 @@
 """Asset management: device asset details, people, locations and licences."""
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from inventory.forms import DeviceAssetForm
@@ -193,6 +195,25 @@ def test_person_page_lists_devices_and_licences(logged_in, make_device, anna):
 
     assert "Anna&#x27;s PC" in page
     assert "Microsoft 365" in page
+
+
+@pytest.mark.parametrize("page", ["person", "location", "licence"])
+def test_detail_pages_query_once_however_many_devices(
+    logged_in, make_device, anna, reception, page
+):
+    licence = Licence.objects.create(name="Microsoft 365")
+    obj = {"person": anna, "location": reception, "licence": licence}[page]
+
+    def queries_with(count):
+        for _ in range(count):
+            device = make_device(f"192.168.1.{Device.objects.count() + 10}", owner=anna,
+                                 location=reception)  # fmt: skip
+            licence.devices.add(device)
+        with CaptureQueriesContext(connection) as queries:
+            assert logged_in.get(obj.get_absolute_url()).status_code == 200
+        return len(queries)
+
+    assert queries_with(1) == queries_with(4)  # not one more query per device
 
 
 def test_locations(logged_in, make_device):

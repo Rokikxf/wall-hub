@@ -134,6 +134,8 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 WALL_SCAN_COMMAND = env("WALL_SCAN_COMMAND", "wall-scan")
 WALL_SCAN_PRIVILEGED = env_bool("WALL_SCAN_PRIVILEGED")
 WALL_SCAN_TIMEOUT_S = int(env("WALL_SCAN_TIMEOUT_S", "600"))
+# Scans older than this many days are deleted, except a device's last scan (0: keep all).
+WALL_SCAN_RETENTION_DAYS = int(env("WALL_SCAN_RETENTION_DAYS", "90") or 0)
 WALL_DEFAULT_TARGETS = env("WALL_DEFAULT_TARGETS", "")
 
 # wall-healthcheck: monitoring of devices marked "monitored", started by Celery beat.

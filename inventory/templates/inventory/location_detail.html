@@ -11,5 +11,5 @@
 </div>
 {% if location.notes %}<p>{{ location.notes|linebreaksbr }}</p>{% endif %}
 <h2 class="h5">Devices</h2>
-{% include "inventory/_device_table.html" with devices=location.devices.all %}
+{% include "inventory/_device_table.html" %}
 {% endblock %}
